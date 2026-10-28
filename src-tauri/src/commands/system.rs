@@ -97,26 +97,21 @@ pub async fn system_run_probe(
         Ok(out) => {
             let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if s.is_empty() {
-                let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-                if err.contains("not found") || err.is_empty() {
-                    "Belum terinstal (rootfs minimal)".to_string()
-                } else {
-                    err
-                }
+                String::from_utf8_lossy(&out.stderr).trim().to_string()
             } else {
                 s
             }
         }
-        Err(e) => format!("git tidak terpasang ({e})"),
+        Err(e) => format!("git error ({e})"),
     };
 
-    // 4. Probe network: verifikasi konektivitas internet via Node fetch
+    // 4. Probe network: curl https://registry.npmjs.org
     let mut cmd_net = proot_exec(
         &proot_bin,
         &rootfs_dir,
         &tmp_dir,
         "/",
-        "node -e \"fetch('https://registry.npmjs.org').then(r => console.log('HTTPS ' + r.status + ' OK (registry.npmjs.org)')).catch(e => console.error(e.message))\"",
+        "curl -Is --connect-timeout 5 https://registry.npmjs.org | head -n 1",
         &[],
         no_seccomp,
     );
@@ -134,7 +129,10 @@ pub async fn system_run_probe(
     };
 
     let elapsed = start_time.elapsed().as_millis() as u64;
-    let success = uname_str.contains("aarch64") && node_str.starts_with('v');
+    let success = uname_str.contains("aarch64")
+        && node_str.starts_with('v')
+        && git_str.contains("git version")
+        && net_str.contains("200");
 
     Ok(ProbeResult {
         success,
@@ -150,7 +148,7 @@ pub async fn system_run_probe(
         error: if success {
             None
         } else {
-            Some("Node.js gagal mengembalikan versi valid".into())
+            Some("Verifikasi toolchain gagal (pastikan node, git, dan curl berfungsi)".into())
         },
     })
 }

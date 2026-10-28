@@ -84,7 +84,8 @@ pub fn ensure_rootfs_ready(app_files_dir: &Path) -> Result<PathBuf, String> {
 
     for rootfs_dir in &candidates {
         let node_bin = rootfs_dir.join("usr/local/bin/node");
-        if node_bin.exists() {
+        let git_bin = rootfs_dir.join("usr/bin/git");
+        if node_bin.exists() && git_bin.exists() {
             ensure_resolv_conf(rootfs_dir)?;
             let _ = fs::create_dir_all(rootfs_dir.join("tmp"));
             return Ok(rootfs_dir.clone());
@@ -125,9 +126,11 @@ pub fn ensure_rootfs_ready(app_files_dir: &Path) -> Result<PathBuf, String> {
             .status();
 
         let node_bin = rootfs_dir.join("usr/local/bin/node");
-        if !node_bin.exists() {
+        let git_bin = rootfs_dir.join("usr/bin/git");
+        if !node_bin.exists() || !git_bin.exists() {
             return Err(
-                "Ekstraksi rootfs gagal: binary node tidak ditemukan di rootfs".to_string(),
+                "Ekstraksi rootfs gagal: binary node atau git tidak ditemukan di rootfs"
+                    .to_string(),
             );
         }
     } else {
