@@ -27,3 +27,15 @@ pub struct Pm2Status {
     pub cpu: f32,
     pub memory: u64,
 }
+
+/// Probe Result model for Fase 1 (PRD Section 13 Fase 1)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProbeResult {
+    pub success: bool,
+    pub uname: String,
+    pub node_version: String,
+    pub git_version: String,
+    pub network_check: String,
+    pub elapsed_ms: u64,
+    pub error: Option<String>,
+}

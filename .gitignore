@@ -18,6 +18,7 @@ src-tauri/gen/android/app/build/
 *.aab
 
 # Binaries and downloaded rootfs assets
+*.so
 src-tauri/assets/*
 !src-tauri/assets/.gitkeep
 

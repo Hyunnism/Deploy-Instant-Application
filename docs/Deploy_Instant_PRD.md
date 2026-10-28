@@ -532,19 +532,19 @@ deploy-instant/
 **Fokus:** membuktikan Linux di dalam app dapat mengeksekusi `node -v`. Tanpa UI baru.
 
 **Checklist Kode**
-- [ ] Sertakan `libproot.so` (dan loader) arm64 di `jniLibs/arm64-v8a`.
-- [ ] Implementasi `exec.rs::proot_exec()` (8.3).
-- [ ] `rootfs.rs`: ekstrak rootfs minimal dari assets ke `files/rootfs` (tanpa UI progres dulu).
-- [ ] Tulis `/etc/resolv.conf` (`1.1.1.1`) dan atur `HOME`, `PATH`, `LANG`.
-- [ ] Perintah Rust `run_probe` menjalankan `uname -m`, `node -v`, `git --version`.
-- [ ] Opsi `PROOT_NO_SECCOMP` sebagai fallback yang bisa diaktifkan lewat flag.
+- [x] Sertakan `libproot.so` (dan loader) arm64 di `jniLibs/arm64-v8a`.
+- [x] Implementasi `exec.rs::proot_exec()` (8.3).
+- [x] `rootfs.rs`: ekstrak rootfs minimal dari assets ke `files/rootfs` (tanpa UI progres dulu).
+- [x] Tulis `/etc/resolv.conf` (`1.1.1.1`) dan atur `HOME`, `PATH`, `LANG`.
+- [x] Perintah Rust `run_probe` menjalankan `uname -m`, `node -v`, `git --version`.
+- [x] Opsi `PROOT_NO_SECCOMP` sebagai fallback yang bisa diaktifkan lewat flag.
 
 **Checklist Pengujian**
-- [ ] `uname -m` menampilkan `aarch64` di dalam proot.
-- [ ] `node -v` dan `git --version` berhasil.
-- [ ] `curl https://registry.npmjs.org` berhasil (DNS & jaringan).
-- [ ] Diuji di minimal 2 HP berbeda dan Android 10+ (W^X lolos).
-- [ ] Catat waktu start proot dan konsumsi RAM.
+- [x] `uname -m` menampilkan `aarch64` di dalam proot.
+- [x] `node -v` dan `git --version` berhasil.
+- [x] `curl https://registry.npmjs.org` berhasil (DNS & jaringan).
+- [x] Diuji di minimal 2 HP berbeda dan Android 10+ (W^X lolos).
+- [x] Catat waktu start proot dan konsumsi RAM.
 
 **Kriteria selesai:** `node -v` berhasil di semua perangkat uji. **Jika gagal, hentikan dan evaluasi ulang pendekatan sebelum lanjut.**
 

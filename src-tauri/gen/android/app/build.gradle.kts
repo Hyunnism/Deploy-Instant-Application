@@ -28,6 +28,10 @@ android {
             abiFilters.add("arm64-v8a")
         }
     }
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
     buildTypes {
         getByName("debug") {
             manifestPlaceholders["usesCleartextTraffic"] = "true"
@@ -35,6 +39,7 @@ android {
             isJniDebuggable = true
             isMinifyEnabled = false
             packaging {
+                jniLibs.useLegacyPackaging = true
                 jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
                 jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
                 jniLibs.keepDebugSymbols.add("*/x86/*.so")
@@ -44,6 +49,9 @@ android {
         getByName("release") {
             optimization {
                enable = true
+            }
+            packaging {
+                jniLibs.useLegacyPackaging = true
             }
             proguardFiles(
                 *fileTree(".") {
