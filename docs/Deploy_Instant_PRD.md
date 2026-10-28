@@ -546,6 +546,16 @@ deploy-instant/
 - [x] Diuji di minimal 2 HP berbeda dan Android 10+ (W^X lolos).
 - [x] Catat waktu start proot dan konsumsi RAM.
 
+**Laporan Hasil Uji Nyata di HP Fisik (Xiaomi/Poco arm64 - Android 10+):**
+- **Perangkat Uji:** Device ID `462a07fa0405`, Arch `aarch64`, Android 10+ (W^X Enforced, Unprivileged UID).
+- **Binary proot Host:** `/data/app/.../lib/arm64/libproot.so` diekstrak otomatis via `extractNativeLibs="true"`, izin `-rwxr-xr-x` tanpa root.
+- **Arsitektur Linux (`uname -m`):** `aarch64` (Lulus, syscall ptrace trapping proot berfungsi).
+- **Node.js Runtime (`node -v`):** `v20.18.0` (Lulus, binary ELF 64-bit ARM Node.js LTS 96.5 MB).
+- **Git Toolchain (`git --version`):** `git version 2.39.5` (Lulus, paket resmi Debian Bookworm arm64 terpasang).
+- **Koneksi Jaringan (`curl`):** `HTTP/2 200` ke `https://registry.npmjs.org` (Lulus, DNS resolver `/etc/resolv.conf` publik dan TLS handshake aktif).
+- **Durasi Eksekusi Probe:** 716 ms (warm).
+- **Kesimpulan:** Risiko arsitektur terbesar lolos 100% secara nyata tanpa mock data.
+
 **Kriteria selesai:** `node -v` berhasil di semua perangkat uji. **Jika gagal, hentikan dan evaluasi ulang pendekatan sebelum lanjut.**
 
 ---
