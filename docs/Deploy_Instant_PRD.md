@@ -149,7 +149,7 @@ Satu aplikasi yang membundel: rootfs Linux (proot) + Node.js + git + PM2 + cloud
 | UI | HTML + TypeScript ringan (Preact atau vanilla), tanpa framework berat | Layar sedikit, ukuran kecil. |
 | Isolasi Linux | **proot** (dari `libproot.so` di `jniLibs/arm64-v8a`) | Tanpa root; lolos batasan W^X Android 10+. |
 | Rootfs | **Debian (glibc) arm64**, minimal, `tar.xz` | Kompatibilitas Node dan addon npm lebih baik daripada Alpine/musl. |
-| Runtime | Node.js LTS, npm, git, **PM2** (di dalam rootfs) | Sama dengan lingkungan VPS. |
+| Runtime | Node.js v24.22.1 LTS, npm, git, **PM2** (di dalam rootfs) | Sama dengan lingkungan VPS modern. |
 | Tunnel | **cloudflared** linux-arm64 (di dalam rootfs) | Quick tunnel gratis, tanpa akun. |
 | Penyimpanan data | **SQLite** (`rusqlite`) untuk metadata project | Ringan, satu file. |
 | Rahasia | **Android Keystore** (lewat plugin Tauri atau JNI) | Menyimpan kunci enkripsi untuk PAT dan env. |
@@ -561,13 +561,15 @@ deploy-instant/
 ---
 
 ### Fase 2 — Rootfs Lengkap dan Setup Pertama
-**Fokus:** lingkungan siap pakai (node, npm, git, pm2, cloudflared) dengan pengalaman setup yang layak.
+**Fokus:** lingkungan siap pakai (Node.js v24.22.1 LTS, npm, git, pm2, cloudflared) dengan pengalaman setup yang layak.
+
+> **Keputusan Versi Runtime Node.js:** Node.js v20 di Fase 1 (yang digunakan sebagai minimal baseline) di-upgrade ke **Node.js v24.22.1 LTS** pada rootfs final Fase 2 ini untuk menjamin kompatibilitas runtime jangka panjang dengan framework JavaScript modern.
 
 **Checklist Kode**
-- [ ] Skrip build rootfs final (Debian arm64: node LTS, git, ca-certificates, pm2, cloudflared) beserta checksum SHA256.
+- [ ] Skrip build rootfs final (Debian arm64: Node.js v24.22.1 LTS, git, ca-certificates, pm2, cloudflared) beserta checksum SHA256.
 - [ ] `rootfs.rs`: ekstraksi dengan progres (event ke UI), cek ruang disk, dan penanda versi rootfs.
 - [ ] Layar Setup di UI (progres dan error dengan Coba lagi).
-- [ ] Verifikasi pasca-setup: `node -v`, `pm2 -v`, `cloudflared --version`.
+- [ ] Verifikasi pasca-setup: `node -v` (v24.22.1), `pm2 -v`, `cloudflared --version`.
 - [ ] Penanganan setup terputus (resume atau ulang bersih).
 
 **Checklist Pengujian**
