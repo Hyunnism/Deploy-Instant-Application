@@ -1,2 +1,37 @@
-Deploy_Instant_PRD.md
-Deploy_Instant_PRD.pdf
+# Node / UI
+node_modules/
+dist/
+ui/dist/
+ui/node_modules/
+
+# Rust
+target/
+src-tauri/target/
+**/*.rs.bk
+Cargo.lock
+
+# Android Build Outputs
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/build/
+src-tauri/gen/android/app/build/
+*.apk
+*.aab
+
+# Binaries and downloaded rootfs assets
+src-tauri/assets/*
+!src-tauri/assets/.gitkeep
+
+# Logs, env, and secrets
+*.log
+logs/
+.env
+*.keystore
+*.jks
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store
+*.pdf

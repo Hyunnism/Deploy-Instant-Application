@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, 'feat/**', 'fix/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check:
+    name: Lint, Format & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Build UI
+        run: |
+          cd ui
+          npm ci
+          npm run build
+
+      - name: Check Rust formatting
+        run: |
+          cd src-tauri
+          cargo fmt --check
+
+      - name: Check Rust clippy
+        run: |
+          cd src-tauri
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Run Tests
+        run: |
+          cd src-tauri
+          cargo test

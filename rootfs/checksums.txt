@@ -1,0 +1,2 @@
+# SHA256 checksums untuk asset rootfs, proot, dan cloudflared
+# Divalidasi saat download atau build APK

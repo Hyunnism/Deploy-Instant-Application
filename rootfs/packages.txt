@@ -1,0 +1,8 @@
+# Paket apt minimal untuk rootfs Debian arm64 Deploy Instant
+ca-certificates
+curl
+git
+tar
+xz-utils
+nodejs
+npm
