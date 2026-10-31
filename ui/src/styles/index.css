@@ -9,7 +9,7 @@
   --text-subtle: #94a3b8;
   --border-light: rgba(0, 0, 0, 0.07);
   --border-focus: #3b82f6;
-  
+
   --primary: #1e293b;
   --primary-hover: #0f172a;
   --primary-text: #ffffff;
@@ -63,7 +63,7 @@ body {
 .app-container {
   max-width: 540px;
   margin: 0 auto;
-  padding: 14px 16px;
+  padding: max(32px, env(safe-area-inset-top, 32px)) 16px 32px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -145,6 +145,28 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.overview-card:active {
+  transform: scale(0.985);
+  box-shadow: var(--shadow-md);
+}
+
+.overview-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-detail-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+  padding: 3px 8px;
+  border-radius: 12px;
 }
 
 .overview-header {
@@ -485,7 +507,11 @@ body {
   align-items: flex-end;
   justify-content: center;
   z-index: 1000;
-  padding-bottom: 24px;
+}
+
+.modal-overlay.dialog {
+  align-items: center;
+  padding: 20px;
 }
 
 @media (min-width: 600px) {
@@ -496,11 +522,10 @@ body {
 }
 
 .modal-sheet {
-  background: var(--bg-app);
+  background: #ffffff;
   width: 100%;
   max-width: 520px;
-  height: 78vh;
-  max-height: 78vh;
+  max-height: 85vh;
   border-top-left-radius: var(--radius-xl);
   border-top-right-radius: var(--radius-xl);
   display: flex;
@@ -512,7 +537,6 @@ body {
 @media (min-width: 600px) {
   .modal-sheet {
     border-radius: var(--radius-xl);
-    height: auto;
     max-height: 82vh;
   }
 }
@@ -521,6 +545,7 @@ body {
   from {
     transform: translateY(100%);
   }
+
   to {
     transform: translateY(0);
   }
@@ -714,10 +739,10 @@ body {
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
-  padding: 12px 20px 18px 20px;
+  padding: 12px 20px max(16px, env(safe-area-inset-bottom, 16px)) 20px;
   flex-shrink: 0;
   border-top: 1px solid var(--border-light);
-  background: var(--bg-app);
+  background: #ffffff;
 }
 
 .modal-btn {
@@ -753,13 +778,130 @@ body {
 
 /* Delete Confirmation Modal Card */
 .delete-confirm-box {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 22px 20px;
+  background: #ffffff;
+  border-radius: var(--radius-xl);
+  padding: 24px 22px;
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+}
+
+/* Engine Detail Modal (Reference 2 Inspired) */
+.engine-hero-card {
+  display: flex;
+  align-items: center;
   gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
+}
+
+.engine-hero-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.engine-hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.engine-hero-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.engine-hero-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.engine-spec-list {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.engine-spec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.engine-spec-row:not(:last-child) {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.engine-spec-label {
+  font-size: 0.86rem;
+  font-weight: 500;
+  color: var(--text-main);
+}
+
+.engine-spec-value {
+  font-size: 0.86rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.engine-spec-value.healthy {
+  color: var(--success-text);
+  background: var(--success-bg);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+}
+
+.engine-spec-value.warning {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+}
+
+.setup-progress-wrap {
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.setup-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.setup-progress-bar-fill {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 4px;
+  transition: width 0.3s ease;
 }
 
 /* Settings View */

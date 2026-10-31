@@ -63,6 +63,16 @@ export const translations = {
     envKeyPlaceholder: 'KEY (misal: PORT)',
     envValPlaceholder: 'VALUE',
     
+    // Engine Detail Modal
+    engineModalTitle: 'Detail Engine & Toolchain',
+    engineInfoSubtitle: 'Debian Bookworm arm64 Runtime',
+    monitoringSection: 'Dependensi Terpasang',
+    installEngineBtn: 'Pasang Lingkungan Server',
+    reverifyBtn: 'Periksa Ulang Toolchain',
+    engineNotInstalled: 'Lingkungan server belum terpasang di perangkat ini.',
+    engineInstalledDesc: 'Seluruh dependensi utama siap menjalankan aplikasi Node.js mandiri.',
+    viewDetailPill: 'Detail ➔',
+    
     // Delete Confirmation Modal
     modalDeleteTitle: 'Hapus Project?',
     modalDeleteMsg: 'Apakah Anda yakin ingin menghapus project ini? Seluruh konfigurasi dan data project akan dihapus secara permanen.',
@@ -143,6 +153,16 @@ export const translations = {
     addEnvBtn: '+ Add Variable',
     envKeyPlaceholder: 'KEY (e.g. PORT)',
     envValPlaceholder: 'VALUE',
+    
+    // Engine Detail Modal
+    engineModalTitle: 'Engine & Toolchain Details',
+    engineInfoSubtitle: 'Debian Bookworm arm64 Runtime',
+    monitoringSection: 'Installed Dependencies',
+    installEngineBtn: 'Install Server Environment',
+    reverifyBtn: 'Re-check Toolchain',
+    engineNotInstalled: 'Server environment is not installed on this device.',
+    engineInstalledDesc: 'All primary dependencies are ready to execute Node.js applications autonomously.',
+    viewDetailPill: 'Details ➔',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Delete Project?',

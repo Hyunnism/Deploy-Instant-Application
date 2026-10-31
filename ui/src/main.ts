@@ -8,8 +8,10 @@ import {
   deleteProject,
   getSetting,
   listProjects,
+  onSetupProgress,
   runProotProbe,
   setSetting,
+  startSetup,
   updateProject,
   verifySetup,
   type Project,
@@ -67,6 +69,7 @@ function render() {
       <!-- Modals -->
       ${renderFormModal()}
       ${renderDeleteModal()}
+      ${renderEngineModal()}
     </div>
   `;
 
@@ -81,20 +84,25 @@ function renderDashboardView(isReady: boolean): string {
 
   return `
     <!-- System Status Overview Card (Open Pi Style) -->
-    <section class="overview-card">
+    <section class="overview-card" id="card-instant-engine" title="Klik untuk melihat detail atau instal toolchain">
       <div class="overview-header">
         <div class="overview-title-group">
           <h2>${t('activeEngine')}</h2>
           <div class="overview-subtitle">${t('toolchainHeader')}</div>
         </div>
-        <div class="status-badge ${isReady ? 'healthy' : 'warning'}">
-          ${isReady ? t('statusReady') : t('statusNotReady')}
+        <div class="overview-header-actions">
+          <div class="status-badge ${isReady ? 'healthy' : 'warning'}">
+            ${isReady ? t('statusReady') : t('statusNotReady')}
+          </div>
+          <span class="overview-detail-pill">${t('viewDetailPill')}</span>
         </div>
       </div>
       <div class="overview-metrics">
         <div class="metric-col">
           <span class="metric-label">${t('uptime')}</span>
-          <span class="metric-val" style="color: var(--success);">${t('statusReady')}</span>
+          <span class="metric-val" style="color: ${isReady ? 'var(--success)' : 'var(--warning)'};">
+            ${isReady ? t('statusReady') : t('statusNotReady')}
+          </span>
         </div>
         <div class="metric-col">
           <span class="metric-label">${t('servicesCount')}</span>
@@ -102,7 +110,7 @@ function renderDashboardView(isReady: boolean): string {
         </div>
         <div class="metric-col">
           <span class="metric-label">${t('storageUsed')}</span>
-          <span class="metric-val">~343 MB</span>
+          <span class="metric-val">${isReady ? '~343 MB' : '-'}</span>
         </div>
       </div>
     </section>
@@ -416,7 +424,7 @@ function renderDeleteModal(): string {
   if (!modal.isOpen || !modal.project) return '';
 
   return `
-    <div class="modal-overlay" id="delete-modal-overlay">
+    <div class="modal-overlay dialog" id="delete-modal-overlay">
       <div class="delete-confirm-box" style="width: 90%; max-width: 400px; margin: auto;">
         <div class="overview-title-group">
           <h2>${t('modalDeleteTitle')}</h2>
@@ -430,11 +438,124 @@ function renderDeleteModal(): string {
 
         ${modal.error ? `<div class="modal-alert error">${modal.error}</div>` : ''}
 
-        <div class="modal-footer" style="margin-top: 8px;">
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
           <button class="modal-btn cancel" id="btn-cancel-delete">${t('modalCancel')}</button>
           <button class="modal-btn danger" id="btn-confirm-delete" ${modal.isDeleting ? 'disabled' : ''}>
             ${modal.isDeleting ? 'Menghapus...' : t('confirmDeleteBtn')}
           </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// ENGINE DETAIL & INSTALL MODAL (Open Pi Service Style)
+// -------------------------------------------------------------
+function renderEngineModal(): string {
+  if (!state.engineModal.isOpen) return '';
+
+  const isReady = state.setupInfo?.is_ready ?? false;
+  const isExtracting = state.setupStatus === 'extracting';
+  const isVerifying = state.setupStatus === 'verifying';
+  const progress = state.setupProgress;
+  const vRes = state.setupVerification;
+
+  const nodeVer = cleanVer(vRes?.node_version, isReady ? 'v24.22.1 LTS' : 'Belum Terpasang');
+  const pm2Ver = cleanVer(vRes?.pm2_version, isReady ? '7.1.1' : 'Belum Terpasang');
+  const cfVer = cleanVer(vRes?.cloudflared_version, isReady ? '2026.10.7' : 'Belum Terpasang');
+  const gitVer = cleanVer(vRes?.git_version, isReady ? '2.39.5' : 'Belum Terpasang');
+  const diskUsed = vRes?.disk_used_mb ? `${vRes.disk_used_mb} MB` : isReady ? '~343 MB' : '-';
+
+  return `
+    <div class="modal-overlay" id="engine-modal-overlay">
+      <div class="modal-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <h3 class="modal-title">${t('engineModalTitle')}</h3>
+          <button class="modal-close-btn" id="btn-close-engine-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Hero Card -->
+          <div class="engine-hero-card">
+            <div class="engine-hero-icon">⚡</div>
+            <div class="engine-hero-info">
+              <span class="engine-hero-title">${t('activeEngine')}</span>
+              <span class="engine-hero-sub">${t('engineInfoSubtitle')}</span>
+            </div>
+          </div>
+
+          <!-- Specs List (Ref 2 Service Monitoring Style) -->
+          <div class="engine-spec-list">
+            <div class="form-group-title">${t('monitoringSection')}</div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">Status Lingkungan</span>
+              <span class="engine-spec-value ${isReady ? 'healthy' : 'warning'}">
+                ${isReady ? t('statusReady') : t('statusNotReady')}
+              </span>
+            </div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">Node.js Runtime</span>
+              <span class="engine-spec-value">${nodeVer}</span>
+            </div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">PM2 Process Manager</span>
+              <span class="engine-spec-value">${pm2Ver}</span>
+            </div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">Cloudflared Tunnel</span>
+              <span class="engine-spec-value">${cfVer}</span>
+            </div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">Git SCM</span>
+              <span class="engine-spec-value">${gitVer}</span>
+            </div>
+            <div class="engine-spec-row">
+              <span class="engine-spec-label">Ruang Rootfs Terpakai</span>
+              <span class="engine-spec-value">${diskUsed}</span>
+            </div>
+          </div>
+
+          <!-- If extracting / installing -->
+          ${
+            isExtracting && progress
+              ? `
+          <div class="setup-progress-wrap">
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600;">
+              <span>${progress.message}</span>
+              <span>${progress.percent}%</span>
+            </div>
+            <div class="setup-progress-bar-bg">
+              <div class="setup-progress-bar-fill" style="width: ${progress.percent}%;"></div>
+            </div>
+          </div>
+          `
+              : ''
+          }
+
+          <!-- Info text -->
+          <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; padding: 2px 4px;">
+            ${isReady ? t('engineInstalledDesc') : t('engineNotInstalled')}
+          </p>
+        </div>
+
+        <!-- Sticky Footer -->
+        <div class="modal-footer">
+          <button class="modal-btn cancel" id="btn-cancel-engine-modal">${t('modalClose')}</button>
+          ${
+            !isReady
+              ? `
+            <button class="modal-btn primary" id="btn-start-engine-setup" ${isExtracting || isVerifying ? 'disabled' : ''}>
+              ${isExtracting ? t('statusInstalling') : t('installEngineBtn')}
+            </button>
+          `
+              : `
+            <button class="modal-btn primary" id="btn-reverify-engine" ${isVerifying ? 'disabled' : ''}>
+              ${isVerifying ? 'Memverifikasi...' : t('reverifyBtn')}
+            </button>
+          `
+          }
         </div>
       </div>
     </div>
@@ -513,6 +634,59 @@ function attachEventListeners() {
       const res = await verifySetup();
       state.setupVerification = res;
       state.setupStatus = res.success ? 'ready' : 'error';
+    } catch (err: any) {
+      state.setupStatus = 'error';
+    }
+    render();
+  });
+
+  // Engine Modal Handlers
+  document.getElementById('card-instant-engine')?.addEventListener('click', () => {
+    state.engineModal.isOpen = true;
+    render();
+  });
+
+  document.getElementById('btn-close-engine-modal')?.addEventListener('click', () => {
+    state.engineModal.isOpen = false;
+    render();
+  });
+
+  document.getElementById('btn-cancel-engine-modal')?.addEventListener('click', () => {
+    state.engineModal.isOpen = false;
+    render();
+  });
+
+  document.getElementById('btn-start-engine-setup')?.addEventListener('click', async () => {
+    state.setupStatus = 'extracting';
+    render();
+
+    try {
+      const unlisten = await onSetupProgress((p) => {
+        state.setupProgress = p;
+        render();
+      });
+
+      const res = await startSetup();
+      unlisten();
+      state.setupVerification = res;
+      state.setupStatus = res.success ? 'ready' : 'error';
+      state.setupInfo = await checkSetupStatus();
+    } catch (err: any) {
+      state.setupStatus = 'error';
+      state.setupError = String(err);
+    }
+    render();
+  });
+
+  document.getElementById('btn-reverify-engine')?.addEventListener('click', async () => {
+    state.setupStatus = 'verifying';
+    render();
+
+    try {
+      const res = await verifySetup();
+      state.setupVerification = res;
+      state.setupStatus = res.success ? 'ready' : 'error';
+      state.setupInfo = await checkSetupStatus();
     } catch (err: any) {
       state.setupStatus = 'error';
     }

@@ -19,11 +19,12 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
   - Desain antarmuka modern adaptasi referensi visual "Open Pi":
     - Palet warna light off-white `#f4f5f8`, kartu rounded white `#ffffff` dengan border halus dan soft elevation shadow.
     - Top navigation bar: tombol Settings, judul app, pintasan Diagnostik, dan tombol buat project.
-    - Overview card: Engine status pill (`Healthy` / `Siap`), subjudul toolchain, serta 3-kolom metrik ringkas (Status, Total Project Aktif, Ruang Rootfs ~343 MB).
+    - Overview card: Engine status pill (`Healthy` / `Siap`), subjudul toolchain, serta 3-kolom metrik ringkas (Status, Total Project Aktif, Ruang Rootfs ~343 MB). Interaktif dan dapat diklik untuk membuka modal rincian spesifikasi toolchain (Node.js, PM2, Cloudflared, Git, Rootfs disk) dan tombol pasang/periksa ulang toolchain terintegrasi.
     - Project Card: inisial ikon dinamis, nama project, badge branch, badge port, badge auto-start, baris repo Git monospace, ringkasan perintah build/start, serta aksi Ubah dan Hapus.
     - Empty state elegan: ikon folder, deskripsi edukasi, dan tombol tambah project pertama.
-    - Form modal bergaya bottom sheet modern: pengelompokan kartu (Informasi Repository, Konfigurasi Eksekusi, Environment Variables editor) dan footer aksi sticky.
-    - Modal dialog konfirmasi hapus berperingatan jelas dengan aksi destruktif aman.
+    - Form modal bergaya bottom sheet modern: pengelompokan kartu (Informasi Repository, Konfigurasi Eksekusi, Environment Variables editor) dan footer aksi sticky dengan penyesuaian tinggi natural dan padding aman perangkat (`env(safe-area-inset-bottom)`).
+    - Modal dialog konfirmasi hapus berperingatan jelas dengan desain pure white `#ffffff` tanpa bayangan abu-abu dan aksi destruktif aman.
+    - Safe-area header adaptif: penambahan padding atas `max(32px, env(safe-area-inset-top, 32px))` agar header tidak menempel ke status bar/kamera notch Android.
     - Pengaturan aplikasi: selector dwibahasa (Bahasa Indonesia & English) yang tersimpan persisten di SQLite, informasi versi, dan pintasan diagnostik sistem.
   - Verifikasi langsung di HP fisik (`462a07fa0405`): Create, Read, Update, Delete, Persistence saat restart app (`force-stop`), dan Language switch lolos 100%.
 

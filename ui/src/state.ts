@@ -51,6 +51,11 @@ export interface AppState {
     error: string | null;
   };
 
+  // Engine Detail Modal State
+  engineModal: {
+    isOpen: boolean;
+  };
+
   // Fase 1 Probe State
   lastPing: PingResponse | null;
   latencyMs: number | null;
@@ -68,10 +73,10 @@ export interface AppState {
 }
 
 export const defaultFormData: ProjectFormData = {
-  name: 'my-express-app',
-  repo_url: 'https://github.com/expressjs/express.git',
+  name: '',
+  repo_url: '',
   branch: 'main',
-  port_manual: '3000',
+  port_manual: '',
   build_cmd: 'npm install',
   start_cmd: 'npm start',
   auto_start: true,
@@ -100,6 +105,10 @@ export const state: AppState = {
     project: null,
     isDeleting: false,
     error: null,
+  },
+
+  engineModal: {
+    isOpen: false,
   },
 
   lastPing: null,
