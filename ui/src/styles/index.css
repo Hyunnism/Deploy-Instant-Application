@@ -705,12 +705,17 @@ body {
   gap: 14px;
 }
 
+.modal-body > * {
+  flex-shrink: 0;
+}
+
 /* Grouped Form Card */
 .form-group-card {
   background: var(--bg-card);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .form-group-title {
@@ -946,6 +951,27 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.engine-spec-rows-scroll {
+  overflow-y: auto;
+  max-height: 180px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.engine-spec-rows-scroll::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.engine-spec-rows-scroll::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
 }
 
 .engine-spec-row {
@@ -1424,4 +1450,34 @@ body {
   outline: none;
   border-color: var(--accent-blue);
   background: #ffffff;
+}
+
+/* Responsive adaptations for compact screens / small height devices */
+@media (max-height: 720px) {
+  .modal-sheet {
+    height: 90%;
+    max-height: 90%;
+  }
+
+  .engine-spec-rows-scroll {
+    max-height: 140px;
+  }
+
+  .engine-logs-box {
+    max-height: 130px;
+    min-height: 80px;
+  }
+
+  .form-row {
+    padding: 8px 12px;
+    gap: 4px;
+  }
+
+  .form-input {
+    padding: 8px 12px;
+  }
+
+  .dotenv-textarea {
+    height: 150px;
+  }
 }

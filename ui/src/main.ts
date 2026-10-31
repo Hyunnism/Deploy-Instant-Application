@@ -845,31 +845,33 @@ function renderEngineModal(): string {
           <!-- Specs List (Ref 2 Service Monitoring Style) -->
           <div class="engine-spec-list">
             <div class="form-group-title">${t('monitoringSection')}</div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">Status Lingkungan</span>
-              <span class="engine-spec-value ${isReady ? 'healthy' : 'warning'}">
-                ${isReady ? t('statusReady') : t('statusNotReady')}
-              </span>
-            </div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">Node.js Runtime</span>
-              <span class="engine-spec-value">${nodeVer}</span>
-            </div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">PM2 Process Manager</span>
-              <span class="engine-spec-value">${pm2Ver}</span>
-            </div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">Cloudflared Tunnel</span>
-              <span class="engine-spec-value">${cfVer}</span>
-            </div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">Git SCM</span>
-              <span class="engine-spec-value">${gitVer}</span>
-            </div>
-            <div class="engine-spec-row">
-              <span class="engine-spec-label">Ruang Rootfs Terpakai</span>
-              <span class="engine-spec-value">${diskUsed}</span>
+            <div class="engine-spec-rows-scroll">
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">Status Lingkungan</span>
+                <span class="engine-spec-value ${isReady ? 'healthy' : 'warning'}">
+                  ${isReady ? t('statusReady') : t('statusNotReady')}
+                </span>
+              </div>
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">Node.js Runtime</span>
+                <span class="engine-spec-value">${nodeVer}</span>
+              </div>
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">PM2 Process Manager</span>
+                <span class="engine-spec-value">${pm2Ver}</span>
+              </div>
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">Cloudflared Tunnel</span>
+                <span class="engine-spec-value">${cfVer}</span>
+              </div>
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">Git SCM</span>
+                <span class="engine-spec-value">${gitVer}</span>
+              </div>
+              <div class="engine-spec-row">
+                <span class="engine-spec-label">Ruang Rootfs Terpakai</span>
+                <span class="engine-spec-value">${diskUsed}</span>
+              </div>
             </div>
           </div>
 
