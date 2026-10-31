@@ -49,7 +49,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
+html,
+body {
   height: 100%;
 }
 
@@ -705,7 +706,7 @@ body {
   gap: 14px;
 }
 
-.modal-body > * {
+.modal-body>* {
   flex-shrink: 0;
 }
 
@@ -1427,7 +1428,8 @@ body {
   user-select: none;
 }
 
-.btn-toggle-eye:hover, .btn-toggle-eye:active {
+.btn-toggle-eye:hover,
+.btn-toggle-eye:active {
   color: var(--text-dark);
 }
 
@@ -1451,6 +1453,37 @@ body {
   border-color: var(--accent-blue);
   background: #ffffff;
 }
+
+/* Responsive adaptations for compact screens / small height devices */
+@media (max-height: 720px) {
+  .modal-sheet {
+    height: 90%;
+    max-height: 90%;
+  }
+
+  .engine-spec-rows-scroll {
+    max-height: 140px;
+  }
+
+  .engine-logs-box {
+    max-height: 130px;
+    min-height: 80px;
+  }
+
+  .form-row {
+    padding: 8px 12px;
+    gap: 4px;
+  }
+
+  .form-input {
+    padding: 8px 12px;
+  }
+
+  .dotenv-textarea {
+    height: 150px;
+  }
+}
+
 
 /* Responsive adaptations for compact screens / small height devices */
 @media (max-height: 720px) {
