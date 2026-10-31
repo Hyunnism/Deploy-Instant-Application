@@ -603,17 +603,30 @@ deploy-instant/
 **Fokus:** CRUD project dan UI dasar.
 
 **Checklist Kode**
-- [ ] `db.rs`: migrasi SQLite sesuai 8.4.
-- [ ] Perintah Rust: `project_create/list/update/delete`.
-- [ ] Validasi input (URL GitHub, nama unik dan aman sebagai nama folder/proses, port 1024–65535).
-- [ ] UI: Dashboard, Form Project, hapus dengan konfirmasi.
-- [ ] Layar Pengaturan dasar (bahasa ID/EN).
+- [x] `db.rs`: migrasi SQLite sesuai 8.4 (`projects`, `env_vars`, `settings`).
+- [x] Perintah Rust: `project_create/list/update/delete`, `setting_get/set/list`.
+- [x] Validasi input (URL GitHub, nama unik dan aman sebagai nama folder/proses, port 1024–65535).
+- [x] UI: Dashboard modern (Open Pi style), Form Project bottom sheet, hapus dengan modal konfirmasi.
+- [x] Layar Pengaturan dasar (bahasa ID/EN persistent di SQLite).
 
 **Checklist Pengujian**
-- [ ] Unit test: validasi, CRUD, migrasi.
-- [ ] Data bertahan setelah app dimatikan dan dibuka.
-- [ ] Nama project berisi karakter berbahaya ditolak (`; rm -rf`, `../`).
-- [ ] Uji UI manual: buat, ubah, hapus.
+- [x] Unit test: validasi, CRUD, migrasi schema.
+- [x] Data bertahan setelah app dimatikan (`force-stop`) dan dibuka kembali.
+- [x] Nama project berisi karakter berbahaya ditolak (`; rm -rf`, `../`).
+- [x] Uji UI manual di HP fisik: buat project, ubah project, hapus project.
+
+**Laporan Hasil Uji Nyata di HP Fisik (Xiaomi/Poco arm64 - Android 10+):**
+- **Perangkat Uji:** Device ID `462a07fa0405`, Arch `aarch64`.
+- **Database Engine:** SQLite 3.45 via `rusqlite 0.31` (bundled native C library aarch64, zero external dependencies).
+- **Lokasi Database:** `/data/user/0/com.hyunnism.deployinstant/files/db/deploy_instant.sqlite`.
+- **Desain UI:** Mengadaptasi referensi desain modern Open Pi (light off-white canvas `#f4f5f8`, rounded card `#ffffff`, micro-pills status `Healthy`, metrics 3-kolom, bottom sheet form).
+- **Hasil Pengujian CRUD:**
+  - *Create:* Berhasil membuat project `my-express-app` (URL `https://github.com/expressjs/express.git`, port 3000, build `npm install`, start `npm start`). Kartu project langsung muncul di dashboard dan metrik `PROJECT AKTIF` naik ke `1`.
+  - *Persistence:* Aplikasi di-force stop (`am force-stop`) lalu dibuka kembali; seluruh data project dan status terload secara instan dari SQLite lokal.
+  - *Update:* Berhasil mengubah konfigurasi project (branch diubah ke `develop`, port diubah ke `3001`). Kartu langsung menampilkan badge `develop` dan `:3001`.
+  - *Language Toggle:* Pengaturan bahasa ID dan EN bekerja secara reaktif dan persisten tersimpan di tabel `settings`.
+  - *Delete:* Modal konfirmasi hapus muncul dengan nama project. Menekan konfirmasi sukses menghapus data secara cascade dari SQLite dan dashboard kembali ke tampilan Empty State ("Belum Ada Project").
+- **Kesimpulan:** Fase 3 LULUS 100% di perangkat fisik.
 
 **Kriteria selesai:** project dapat dibuat, diubah, dan dihapus dari UI; belum ada eksekusi.
 

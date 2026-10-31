@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-/// Metadata model for a Project (PRD Section 8.4)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Project entity stored in SQLite (PRD Section 8.4)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Project {
-    pub id: Option<i64>,
+    pub id: i64,
     pub name: String,
     pub repo_url: String,
     pub branch: String,
@@ -14,6 +14,48 @@ pub struct Project {
     pub last_build_ok: Option<bool>,
     pub last_build_at: Option<String>,
     pub created_at: String,
+    pub updated_at: String,
+    pub env_vars: Option<Vec<EnvVarItem>>,
+}
+
+/// Environment variable key-value pair for a project
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EnvVarItem {
+    pub key: String,
+    pub value: String,
+}
+
+/// Input payload for creating a new Project
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateProjectInput {
+    pub name: String,
+    pub repo_url: String,
+    pub branch: Option<String>,
+    pub build_cmd: Option<String>,
+    pub start_cmd: Option<String>,
+    pub port_manual: Option<u16>,
+    pub auto_start: Option<bool>,
+    pub env_vars: Option<Vec<EnvVarItem>>,
+}
+
+/// Input payload for updating an existing Project
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateProjectInput {
+    pub name: Option<String>,
+    pub repo_url: Option<String>,
+    pub branch: Option<String>,
+    pub build_cmd: Option<String>,
+    pub start_cmd: Option<String>,
+    pub port_manual: Option<u16>,
+    pub auto_start: Option<bool>,
+    pub env_vars: Option<Vec<EnvVarItem>>,
+}
+
+/// Setting key-value pair
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SettingItem {
+    pub key: String,
+    pub value: String,
 }
 
 /// PM2 Process Status summary (PRD Section 8.4)

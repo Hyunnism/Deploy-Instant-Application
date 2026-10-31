@@ -1,15 +1,28 @@
+// main.ts
+// Deploy Instant - Modern Clean UI (Open Pi Reference Adaptation)
+
 import './styles/index.css';
 import {
   checkSetupStatus,
-  onSetupProgress,
-  pingBackend,
+  createProject,
+  deleteProject,
+  getSetting,
+  listProjects,
   runProotProbe,
-  startSetup,
+  setSetting,
+  updateProject,
   verifySetup,
+  type Project,
 } from './api';
-import { state } from './state';
+import { translations, type TranslationKey } from './i18n';
+import { defaultFormData, state } from './state';
 
 const appEl = document.getElementById('app')!;
+
+function t(key: TranslationKey): string {
+  const lang = state.language;
+  return translations[lang]?.[key] || translations.id[key] || key;
+}
 
 function cleanVer(v: string | undefined | null, fallback: string): string {
   if (!v) return fallback;
@@ -18,459 +31,733 @@ function cleanVer(v: string | undefined | null, fallback: string): string {
   return last.length > 20 ? last.slice(0, 18) + '...' : last;
 }
 
+// -------------------------------------------------------------
+// RENDER CONTROLLER
+// -------------------------------------------------------------
 function render() {
-  const isPinging = state.status === 'pinging';
-  const isConnected = state.status === 'connected';
-  const isError = state.status === 'error';
-  const indicatorClass = isPinging ? 'pinging' : isConnected ? 'connected' : isError ? 'error' : '';
-
-  const isProbing = state.probeStatus === 'running';
-  const isProbeSuccess = state.probeStatus === 'success';
-  const isProbeFailed = state.probeStatus === 'failed';
-  const probeIndicatorClass = isProbing
-    ? 'pinging'
-    : isProbeSuccess
-    ? 'connected'
-    : isProbeFailed
-    ? 'error'
-    : '';
-
-  const isExtracting = state.setupStatus === 'extracting';
-  const isVerifying = state.setupStatus === 'verifying';
-  const isSetupReady = state.setupInfo?.is_ready ?? false;
-  const setupIndicatorClass = isExtracting || isVerifying
-    ? 'pinging'
-    : isSetupReady
-    ? 'connected'
-    : state.setupStatus === 'error'
-    ? 'error'
-    : '';
-
-  const pRes = state.probeResult;
-  const vRes = state.setupVerification;
-  const progress = state.setupProgress;
+  const isReady = state.setupInfo?.is_ready ?? true;
 
   appEl.innerHTML = `
-    <header class="header">
-      <div class="brand">
-        <div class="logo-badge">⚡</div>
-        <div class="brand-text">
-          <h1>Deploy Instant</h1>
-          <p>Mini VPS di dalam HP</p>
+    <div class="app-container">
+      <!-- Top Navigation Bar -->
+      <nav class="top-nav">
+        <button class="top-nav-btn" id="btn-open-settings" title="${t('settingsTab')}">
+          ⚙️
+        </button>
+        <span class="top-nav-title">${t('appName')}</span>
+        <div class="top-nav-actions">
+          <button class="pill-icon-btn" id="btn-open-diagnostics" title="${t('diagnosticsTab')}">
+            <span>💻</span>
+          </button>
+          <button class="pill-icon-btn primary" id="btn-create-project-top">
+            <span>+</span>
+          </button>
         </div>
-      </div>
-      <span class="phase-pill">Fase 2: Rootfs Setup</span>
-    </header>
+      </nav>
 
-    <main>
+      <!-- Active View -->
       ${
-        !isSetupReady
-          ? `
-      <!-- Kartu Penyiapan Lingkungan Server (First-Run Setup) -->
-      <section class="card" style="border-color: ${
-        state.setupStatus === 'error' ? 'rgba(244, 63, 94, 0.4)' : 'var(--border-active)'
-      };">
-        <div class="card-title">
-          <span>Penyiapan Server (Fase 2)</span>
-          <span class="indicator ${setupIndicatorClass}"></span>
-        </div>
-
-        <div class="setup-banner">
-          <div class="setup-banner-icon">📦</div>
-          <div class="setup-banner-content">
-            <h3>Inisialisasi Lingkungan Linux</h3>
-            <p>Aplikasi akan mengekstrak rootfs Debian lengkap berisi Node.js v24 LTS, PM2, Cloudflared, dan Git ke direktori internal aplikasi.</p>
-          </div>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Ruang Disk Tersedia</span>
-          <span class="status-value">${
-            state.setupInfo ? `${state.setupInfo.free_space_mb} MB` : 'Memeriksa...'
-          }</span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Kebutuhan Minimum</span>
-          <span class="status-value">
-            ${state.setupInfo ? `${state.setupInfo.required_space_mb} MB` : '600 MB'}
-          </span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Versi Target</span>
-          <span class="status-value" style="color: var(--accent-cyan); font-family: var(--font-mono);">
-            24.22.1-lts
-          </span>
-        </div>
-
-        ${
-          isExtracting || isVerifying
-            ? `
-        <div class="progress-box">
-          <div class="progress-info">
-            <span class="progress-message">${progress?.message || 'Memproses...'}</span>
-            <span style="font-weight: 600; font-family: var(--font-mono);">${progress?.percent ?? 0}%</span>
-          </div>
-          <div class="progress-bar-track">
-            <div class="progress-bar-fill" style="width: ${progress?.percent ?? 0}%;"></div>
-          </div>
-        </div>
-        `
-            : ''
-        }
-
-        ${
-          state.setupError
-            ? `<div class="console-box" style="margin-top: 12px; color: var(--accent-rose);">${state.setupError}</div>`
-            : ''
-        }
-
-        <div style="margin-top: 16px;">
-          <button id="btn-start-setup" class="btn-emerald" style="width: 100%;" ${
-            isExtracting || isVerifying ? 'disabled' : ''
-          }>
-            <span>${
-              isExtracting
-                ? `⏳ Mengekstrak Rootfs (${progress?.percent ?? 0}%)...`
-                : isVerifying
-                ? '🔍 Memverifikasi Toolchain...'
-                : state.setupStatus === 'error'
-                ? '🔄 Coba Lagi Setup'
-                : '🚀 Siapkan Lingkungan Server'
-            }</span>
-          </button>
-        </div>
-      </section>
-      `
-          : `
-      <!-- Kartu Toolchain Lingkungan Linux (Ready) -->
-      <section class="card" style="border-color: rgba(16, 185, 129, 0.4);">
-        <div class="card-title">
-          <span>Lingkungan Server Siap</span>
-          <span class="badge-tag">✅ AKTIF</span>
-        </div>
-
-        <div class="toolchain-grid">
-          <div class="toolchain-card">
-            <span class="tool-name">Node.js</span>
-            <span class="tool-version">${cleanVer(
-              vRes?.node_version || state.setupInfo?.version,
-              'v24.22.1'
-            )}</span>
-          </div>
-          <div class="toolchain-card">
-            <span class="tool-name">PM2</span>
-            <span class="tool-version">${cleanVer(vRes?.pm2_version, 'v7.1.1')}</span>
-          </div>
-          <div class="toolchain-card">
-            <span class="tool-name">Cloudflared</span>
-            <span class="tool-version">${cleanVer(vRes?.cloudflared_version, '2026.10.7')}</span>
-          </div>
-          <div class="toolchain-card">
-            <span class="tool-name">Git & Curl</span>
-            <span class="tool-version">${cleanVer(vRes?.git_version, 'v2.39.5')}</span>
-          </div>
-        </div>
-
-        <div class="status-row" style="margin-top: 14px;">
-          <span class="status-label">Ukuran Direktori Rootfs</span>
-          <span class="status-value">${
-            vRes?.disk_used_mb ? `~${vRes.disk_used_mb} MB` : 'Siap'
-          }</span>
-        </div>
-
-        <div style="display: flex; gap: 8px; margin-top: 14px;">
-          <button id="btn-verify-toolchain" class="btn" style="flex: 1; padding: 10px; font-size: 13px;" ${
-            isVerifying ? 'disabled' : ''
-          }>
-            <span>${isVerifying ? '🔍 Menguji...' : '🔍 Verifikasi Toolchain'}</span>
-          </button>
-          <button id="btn-reinstall-setup" class="btn" style="flex: 1; padding: 10px; font-size: 13px; background: rgba(255,255,255,0.05); box-shadow: none;">
-            <span>🔄 Re-install</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- Kartu Pembuktian proot (Fase 1 Regression & Validation) -->
-      <section class="card" style="border-color: ${
-        isProbeSuccess
-          ? 'rgba(16, 185, 129, 0.4)'
-          : isProbeFailed
-          ? 'rgba(244, 63, 94, 0.4)'
-          : 'var(--border-color)'
-      };">
-        <div class="card-title">
-          <span>Uji Eksekusi Container proot</span>
-          <span class="indicator ${probeIndicatorClass}"></span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Status Eksekusi</span>
-          <span class="status-value">
-            ${
-              isProbing
-                ? 'Menjalankan Probe...'
-                : isProbeSuccess
-                ? '✅ Berhasil (LULUS)'
-                : isProbeFailed
-                ? '❌ Gagal'
-                : 'Belum Diuji'
-            }
-          </span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Arsitektur Kernel</span>
-          <span class="status-value">${pRes ? pRes.uname : '-'}</span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Node.js Runtime</span>
-          <span class="status-value" style="color: ${
-            pRes?.node_version.startsWith('v') ? 'var(--accent-emerald)' : 'inherit'
-          }; font-family: var(--font-mono);">
-            ${pRes ? pRes.node_version : '-'}
-          </span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Git CLI</span>
-          <span class="status-value">${pRes ? pRes.git_version : '-'}</span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Koneksi Jaringan (curl)</span>
-          <span class="status-value">${pRes ? pRes.network_check : '-'}</span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Durasi Eksekusi</span>
-          <span class="status-value">${pRes ? `${pRes.elapsed_ms} ms` : '-'}</span>
-        </div>
-
-        <div style="margin-top: 14px;">
-          <label class="toggle-row">
-            <input type="checkbox" id="chk-no-seccomp" ${state.noSeccomp ? 'checked' : ''} ${
-              isProbing ? 'disabled' : ''
-            } />
-            <span>Aktifkan PROOT_NO_SECCOMP=1 (Fallback)</span>
-          </label>
-        </div>
-
-        <div style="margin-top: 14px;">
-          <button id="btn-probe" class="btn-emerald" style="width: 100%;" ${
-            isProbing ? 'disabled' : ''
-          }>
-            <span>${isProbing ? '⏳ Mengeksekusi Linux proot...' : '🚀 Jalankan Probe proot'}</span>
-          </button>
-        </div>
-
-        ${
-          state.probeError
-            ? `<div class="console-box" style="margin-top: 12px; color: var(--accent-rose);">${state.probeError}</div>`
-            : ''
-        }
-      </section>
-      `
+        state.activeTab === 'settings'
+          ? renderSettingsView()
+          : state.activeTab === 'diagnostics'
+          ? renderDiagnosticsView()
+          : renderDashboardView(isReady)
       }
 
-      <!-- Kartu IPC Host -->
-      <section class="card">
-        <div class="card-title">
-          <span>Status IPC Core (Host)</span>
-          <span class="indicator ${indicatorClass}"></span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Komunikasi Rust JNI</span>
-          <span class="status-value">
-            ${
-              isPinging
-                ? 'Menguji...'
-                : isConnected
-                ? 'Terhubung (Online)'
-                : isError
-                ? 'Gagal'
-                : 'Siap'
-            }
-          </span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Pesan Respons</span>
-          <span class="status-value">${state.lastPing ? state.lastPing.message : '-'}</span>
-        </div>
-
-        <div class="status-row">
-          <span class="status-label">Latensi IPC</span>
-          <span class="status-value">${
-            state.latencyMs !== null ? `${state.latencyMs} ms` : '-'
-          }</span>
-        </div>
-
-        <div style="margin-top: 12px;">
-          <button id="btn-ping" class="btn" style="width: 100%; padding: 10px;" ${
-            isPinging ? 'disabled' : ''
-          }>
-            <span>${isPinging ? 'Menguji...' : '🔄 Uji Ulang Ping Core'}</span>
-          </button>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer">
-      Deploy Instant &bull; Fase 2 Rootfs & Toolchain &bull; Ponytail Clean Architecture
-    </footer>
+      <!-- Modals -->
+      ${renderFormModal()}
+      ${renderDeleteModal()}
+    </div>
   `;
 
-  // Attach event listeners
-  const btnPing = document.getElementById('btn-ping');
-  if (btnPing) {
-    btnPing.addEventListener('click', handlePing);
-  }
+  attachEventListeners();
+}
 
-  const btnStartSetup = document.getElementById('btn-start-setup');
-  if (btnStartSetup) {
-    btnStartSetup.addEventListener('click', handleStartSetup);
-  }
+// -------------------------------------------------------------
+// DASHBOARD VIEW
+// -------------------------------------------------------------
+function renderDashboardView(isReady: boolean): string {
+  const projectCount = state.projects.length;
 
-  const btnVerify = document.getElementById('btn-verify-toolchain');
-  if (btnVerify) {
-    btnVerify.addEventListener('click', handleVerifyToolchain);
-  }
+  return `
+    <!-- System Status Overview Card (Open Pi Style) -->
+    <section class="overview-card">
+      <div class="overview-header">
+        <div class="overview-title-group">
+          <h2>${t('activeEngine')}</h2>
+          <div class="overview-subtitle">${t('toolchainHeader')}</div>
+        </div>
+        <div class="status-badge ${isReady ? 'healthy' : 'warning'}">
+          ${isReady ? t('statusReady') : t('statusNotReady')}
+        </div>
+      </div>
+      <div class="overview-metrics">
+        <div class="metric-col">
+          <span class="metric-label">${t('uptime')}</span>
+          <span class="metric-val" style="color: var(--success);">${t('statusReady')}</span>
+        </div>
+        <div class="metric-col">
+          <span class="metric-label">${t('servicesCount')}</span>
+          <span class="metric-val">${projectCount}</span>
+        </div>
+        <div class="metric-col">
+          <span class="metric-label">${t('storageUsed')}</span>
+          <span class="metric-val">~343 MB</span>
+        </div>
+      </div>
+    </section>
 
-  const btnReinstall = document.getElementById('btn-reinstall-setup');
-  if (btnReinstall) {
-    btnReinstall.addEventListener('click', () => {
-      if (confirm('Apakah Anda yakin ingin mengekstrak ulang rootfs?')) {
-        handleStartSetup();
+    <!-- Project List Section -->
+    <section class="section-header">
+      <h3 class="section-title">${t('projectListHeader')}</h3>
+      <button class="pill-icon-btn primary" id="btn-create-project-header">
+        ${t('newProjectBtn')}
+      </button>
+    </section>
+
+    <div class="projects-container">
+      ${
+        projectCount === 0
+          ? renderEmptyState()
+          : state.projects.map((p) => renderProjectCard(p)).join('')
       }
-    });
-  }
-
-  const btnProbe = document.getElementById('btn-probe');
-  if (btnProbe) {
-    btnProbe.addEventListener('click', handleProbe);
-  }
-
-  const chkNoSeccomp = document.getElementById('chk-no-seccomp') as HTMLInputElement | null;
-  if (chkNoSeccomp) {
-    chkNoSeccomp.addEventListener('change', (e) => {
-      state.noSeccomp = (e.target as HTMLInputElement).checked;
-    });
-  }
+    </div>
+  `;
 }
 
-async function handlePing() {
-  state.status = 'pinging';
-  state.errorMessage = null;
-  render();
+function renderEmptyState(): string {
+  return `
+    <div class="empty-card">
+      <div class="empty-icon">📁</div>
+      <div class="empty-title">${t('noProjectsTitle')}</div>
+      <p class="empty-desc">${t('noProjectsDesc')}</p>
+      <button class="empty-btn" id="btn-create-first-project">
+        ${t('createFirstProject')}
+      </button>
+    </div>
+  `;
+}
 
-  const startTime = performance.now();
-  try {
-    const res = await pingBackend();
-    const elapsed = Math.round(performance.now() - startTime);
-    state.lastPing = res;
-    state.latencyMs = elapsed;
-    state.status = 'connected';
-  } catch (err: any) {
-    state.status = 'error';
-    state.errorMessage = String(err?.message || err);
-  } finally {
+function renderProjectCard(p: Project): string {
+  const initial = (p.name.charAt(0) || 'P').toUpperCase();
+  const portStr = p.port_manual ? `:${p.port_manual}` : ':auto';
+
+  return `
+    <div class="project-card" data-id="${p.id}">
+      <div class="project-card-header">
+        <div class="project-identity">
+          <div class="project-icon-box">${initial}</div>
+          <div class="project-name-wrap">
+            <div class="project-name">${p.name}</div>
+            <div class="project-badges-row">
+              <span class="badge-pill branch">${p.branch}</span>
+              <span class="badge-pill port">${portStr}</span>
+              ${p.auto_start ? `<span class="badge-pill autostart">${t('autoStartBadge')}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        <div class="project-card-actions">
+          <button class="icon-action-btn btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
+          <button class="icon-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
+        </div>
+      </div>
+
+      <div class="project-repo-line">${p.repo_url}</div>
+
+      <div class="project-commands-grid">
+        <div class="command-box">
+          <div class="command-box-label">${t('cardBuild')}</div>
+          <div class="command-box-cmd">${p.build_cmd}</div>
+        </div>
+        <div class="command-box">
+          <div class="command-box-label">${t('cardStart')}</div>
+          <div class="command-box-cmd">${p.start_cmd}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// SETTINGS VIEW
+// -------------------------------------------------------------
+function renderSettingsView(): string {
+  return `
+    <section class="section-header">
+      <h3 class="section-title">${t('settingsTitle')}</h3>
+      <button class="pill-icon-btn" id="btn-back-from-settings">
+        ${t('backToDashboard')}
+      </button>
+    </section>
+
+    <div class="settings-group">
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('languageSection')}</h2>
+        </div>
+        <div class="lang-select-group">
+          <button class="lang-pill-btn ${state.language === 'id' ? 'active' : ''}" id="btn-set-lang-id">
+            ${t('langIndonesian')}
+          </button>
+          <button class="lang-pill-btn ${state.language === 'en' ? 'active' : ''}" id="btn-set-lang-en">
+            ${t('langEnglish')}
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('aboutSection')}</h2>
+        </div>
+        <div class="settings-row">
+          <span class="metric-label">${t('appVersion')}</span>
+          <span class="metric-val" style="font-size: 0.88rem;">v0.4.0 (Fase 3)</span>
+        </div>
+        <div class="settings-row">
+          <span class="metric-label">${t('engineRuntime')}</span>
+          <span class="metric-val" style="font-size: 0.88rem;">Node v24.22.1 LTS + PM2</span>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-top: 4px;">
+          ${t('zeroLaptopNotice')}
+        </p>
+      </div>
+
+      <div class="settings-card">
+        <button class="pill-icon-btn primary" id="btn-diag-shortcut" style="justify-content: center; width: 100%; padding: 10px;">
+          ${t('openDiagnostics')}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// DIAGNOSTICS VIEW (FASE 1 & 2 TOOLCHAIN CHECK)
+// -------------------------------------------------------------
+function renderDiagnosticsView(): string {
+  const pRes = state.probeResult;
+  const vRes = state.setupVerification;
+
+  return `
+    <section class="section-header">
+      <h3 class="section-title">${t('diagnosticsTitle')}</h3>
+      <button class="pill-icon-btn" id="btn-back-from-diag">
+        ${t('backToDashboard')}
+      </button>
+    </section>
+
+    <div class="settings-group">
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>Aksi Pengujian Toolchain</h2>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="pill-icon-btn primary" id="btn-run-probe" ${state.probeStatus === 'running' ? 'disabled' : ''}>
+            ${state.probeStatus === 'running' ? 'Memeriksa...' : t('probeBtn')}
+          </button>
+          <button class="pill-icon-btn" id="btn-run-verify" ${state.setupStatus === 'verifying' ? 'disabled' : ''}>
+            ${state.setupStatus === 'verifying' ? 'Memverifikasi...' : t('verifyBtn')}
+          </button>
+        </div>
+      </div>
+
+      ${
+        pRes
+          ? `
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>Hasil Probe PRoot</h2>
+        </div>
+        <div class="diag-log-box">Status: ${pRes.success ? 'BERHASIL' : 'GAGAL'}
+Waktu: ${pRes.elapsed_ms} ms
+Node: ${pRes.node_version}
+Git: ${pRes.git_version}
+Network: ${pRes.network_check}
+Kernel: ${pRes.uname}</div>
+      </div>
+      `
+          : ''
+      }
+
+      ${
+        vRes
+          ? `
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>Hasil Verifikasi Toolchain</h2>
+        </div>
+        <div class="diag-log-box">Node.js: ${cleanVer(vRes.node_version, 'N/A')}
+PM2: ${cleanVer(vRes.pm2_version, 'N/A')}
+Cloudflared: ${cleanVer(vRes.cloudflared_version, 'N/A')}
+Git: ${cleanVer(vRes.git_version, 'N/A')}
+Disk: ${vRes.disk_used_mb} MB terpasang</div>
+      </div>
+      `
+          : ''
+      }
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FORM MODAL (CREATE / EDIT PROJECT)
+// -------------------------------------------------------------
+function renderFormModal(): string {
+  const modal = state.formModal;
+  if (!modal.isOpen) return '';
+
+  const isEdit = modal.mode === 'edit';
+  const d = modal.data;
+
+  return `
+    <div class="modal-overlay" id="form-modal-overlay">
+      <div class="modal-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <h3 class="modal-title">${isEdit ? t('modalEditTitle') : t('modalCreateTitle')}</h3>
+          <button class="modal-close-btn" id="btn-close-form-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body">
+          ${modal.error ? `<div class="modal-alert error">${modal.error}</div>` : ''}
+
+          <!-- Repository Card -->
+          <div class="form-group-card">
+            <div class="form-group-title">${t('fieldBasicInfo')}</div>
+            <div class="form-row">
+              <label for="input-project-name">${t('fieldName')}</label>
+              <input type="text" id="input-project-name" class="form-input" 
+                autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                placeholder="${t('fieldNamePlaceholder')}" value="${d.name}" ${isEdit ? 'disabled style="opacity:0.6;"' : ''} />
+            </div>
+            <div class="form-row">
+              <label for="input-repo-url">${t('fieldRepoUrl')}</label>
+              <input type="text" id="input-repo-url" class="form-input mono" 
+                autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                placeholder="${t('fieldRepoPlaceholder')}" value="${d.repo_url}" />
+            </div>
+            <div class="form-row">
+              <label for="input-branch">${t('fieldBranch')}</label>
+              <input type="text" id="input-branch" class="form-input mono" 
+                autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                placeholder="${t('fieldBranchPlaceholder')}" value="${d.branch}" />
+            </div>
+          </div>
+
+          <!-- Execution Card -->
+          <div class="form-group-card">
+            <div class="form-group-title">${t('fieldExecution')}</div>
+            <div class="form-row">
+              <label for="input-port">${t('fieldPort')}</label>
+              <input type="number" id="input-port" class="form-input mono" 
+                placeholder="${t('fieldPortPlaceholder')}" value="${d.port_manual}" />
+            </div>
+            <div class="form-row">
+              <label for="input-build-cmd">${t('fieldBuildCmd')}</label>
+              <input type="text" id="input-build-cmd" class="form-input mono" 
+                autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                placeholder="${t('fieldBuildCmdPlaceholder')}" value="${d.build_cmd}" />
+            </div>
+            <div class="form-row">
+              <label for="input-start-cmd">${t('fieldStartCmd')}</label>
+              <input type="text" id="input-start-cmd" class="form-input mono" 
+                autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                placeholder="${t('fieldStartCmdPlaceholder')}" value="${d.start_cmd}" />
+            </div>
+            <div class="form-toggle-row">
+              <label for="input-auto-start">${t('fieldAutoStart')}</label>
+              <input type="checkbox" id="input-auto-start" class="switch-input" ${d.auto_start ? 'checked' : ''} />
+            </div>
+          </div>
+
+          <!-- Env Vars Card -->
+          <div class="form-group-card">
+            <div class="form-group-title">${t('fieldEnvVars')}</div>
+            <div id="env-vars-list">
+              ${
+                d.env_vars.length === 0
+                  ? `<div style="padding: 10px 14px; font-size: 0.8rem; color: var(--text-subtle);">Tidak ada variabel custom.</div>`
+                  : d.env_vars
+                      .map(
+                        (env, idx) => `
+                    <div class="env-row-item">
+                      <input type="text" class="form-input mono env-key-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envKeyPlaceholder')}" value="${env.key}" />
+                      <input type="text" class="form-input mono env-val-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envValPlaceholder')}" value="${env.value}" />
+                      <button class="env-remove-btn" data-index="${idx}" title="Hapus">✕</button>
+                    </div>
+                  `
+                      )
+                      .join('')
+              }
+            </div>
+            <div class="add-env-btn-row">
+              <button class="subtle-btn" id="btn-add-env-row">${t('addEnvBtn')}</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Actions Footer -->
+        <div class="modal-footer">
+          <button class="modal-btn cancel" id="btn-cancel-form-modal">${t('modalCancel')}</button>
+          <button class="modal-btn primary" id="btn-save-project" ${modal.isSaving ? 'disabled' : ''}>
+            ${modal.isSaving ? t('modalSaving') : t('modalSave')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// DELETE CONFIRMATION MODAL
+// -------------------------------------------------------------
+function renderDeleteModal(): string {
+  const modal = state.deleteModal;
+  if (!modal.isOpen || !modal.project) return '';
+
+  return `
+    <div class="modal-overlay" id="delete-modal-overlay">
+      <div class="delete-confirm-box" style="width: 90%; max-width: 400px; margin: auto;">
+        <div class="overview-title-group">
+          <h2>${t('modalDeleteTitle')}</h2>
+          <div class="overview-subtitle" style="font-weight: 600; color: var(--text-main); margin-top: 4px;">
+            ${modal.project.name}
+          </div>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;">
+          ${t('modalDeleteMsg')}
+        </p>
+
+        ${modal.error ? `<div class="modal-alert error">${modal.error}</div>` : ''}
+
+        <div class="modal-footer" style="margin-top: 8px;">
+          <button class="modal-btn cancel" id="btn-cancel-delete">${t('modalCancel')}</button>
+          <button class="modal-btn danger" id="btn-confirm-delete" ${modal.isDeleting ? 'disabled' : ''}>
+            ${modal.isDeleting ? 'Menghapus...' : t('confirmDeleteBtn')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// EVENT LISTENERS & USER ACTIONS
+// -------------------------------------------------------------
+function attachEventListeners() {
+  // Navigation
+  document.getElementById('btn-open-settings')?.addEventListener('click', () => {
+    state.activeTab = state.activeTab === 'settings' ? 'dashboard' : 'settings';
     render();
-  }
-}
+  });
 
-async function handleCheckSetup() {
-  state.setupStatus = 'checking';
-  render();
-  try {
-    const res = await checkSetupStatus();
-    state.setupInfo = res;
-    if (res.is_ready) {
-      state.setupStatus = 'ready';
-      // Automatically run toolchain verification in background
-      handleVerifyToolchain();
-    } else {
-      state.setupStatus = 'not_ready';
+  document.getElementById('btn-open-diagnostics')?.addEventListener('click', () => {
+    state.activeTab = state.activeTab === 'diagnostics' ? 'dashboard' : 'diagnostics';
+    render();
+  });
+
+  document.getElementById('btn-back-from-settings')?.addEventListener('click', () => {
+    state.activeTab = 'dashboard';
+    render();
+  });
+
+  document.getElementById('btn-back-from-diag')?.addEventListener('click', () => {
+    state.activeTab = 'dashboard';
+    render();
+  });
+
+  document.getElementById('btn-diag-shortcut')?.addEventListener('click', () => {
+    state.activeTab = 'diagnostics';
+    render();
+  });
+
+  // Language buttons
+  document.getElementById('btn-set-lang-id')?.addEventListener('click', async () => {
+    state.language = 'id';
+    render();
+    try {
+      await setSetting('language', 'id');
+    } catch (e) {
+      console.error(e);
     }
-  } catch (err: any) {
-    state.setupStatus = 'error';
-    state.setupError = String(err?.message || err);
-  } finally {
+  });
+
+  document.getElementById('btn-set-lang-en')?.addEventListener('click', async () => {
+    state.language = 'en';
     render();
-  }
-}
-
-async function handleStartSetup() {
-  state.setupStatus = 'extracting';
-  state.setupError = null;
-  state.setupProgress = { step: 'extracting', percent: 0, message: 'Memulai ekstraksi...' };
-  render();
-
-  try {
-    const verifyRes = await startSetup();
-    state.setupVerification = verifyRes;
-    state.setupStatus = verifyRes.success ? 'ready' : 'error';
-    if (!verifyRes.success) {
-      state.setupError = verifyRes.error || 'Verifikasi sebagian toolchain gagal';
+    try {
+      await setSetting('language', 'en');
+    } catch (e) {
+      console.error(e);
     }
-    const info = await checkSetupStatus();
-    state.setupInfo = info;
-  } catch (err: any) {
-    state.setupStatus = 'error';
-    state.setupError = String(err?.message || err);
-  } finally {
+  });
+
+  // Diagnostics actions
+  document.getElementById('btn-run-probe')?.addEventListener('click', async () => {
+    state.probeStatus = 'running';
     render();
-  }
-}
-
-async function handleVerifyToolchain() {
-  state.setupStatus = state.setupInfo?.is_ready ? 'ready' : 'verifying';
-  render();
-  try {
-    const vRes = await verifySetup();
-    state.setupVerification = vRes;
-  } catch (err: any) {
-    console.error('Verify toolchain error:', err);
-  } finally {
-    render();
-  }
-}
-
-async function handleProbe() {
-  state.probeStatus = 'running';
-  state.probeError = null;
-  render();
-
-  try {
-    const res = await runProotProbe(state.noSeccomp);
-    state.probeResult = res;
-    if (res.success) {
-      state.probeStatus = 'success';
-    } else {
+    try {
+      const res = await runProotProbe(state.noSeccomp);
+      state.probeResult = res;
+      state.probeStatus = res.success ? 'success' : 'failed';
+    } catch (err: any) {
       state.probeStatus = 'failed';
-      state.probeError = res.error || 'Probe gagal';
     }
+    render();
+  });
+
+  document.getElementById('btn-run-verify')?.addEventListener('click', async () => {
+    state.setupStatus = 'verifying';
+    render();
+    try {
+      const res = await verifySetup();
+      state.setupVerification = res;
+      state.setupStatus = res.success ? 'ready' : 'error';
+    } catch (err: any) {
+      state.setupStatus = 'error';
+    }
+    render();
+  });
+
+  // Project Create buttons
+  const openCreateModal = () => {
+    state.formModal = {
+      isOpen: true,
+      mode: 'create',
+      projectId: null,
+      data: { ...defaultFormData, env_vars: [] },
+      isSaving: false,
+      error: null,
+    };
+    render();
+  };
+
+  document.getElementById('btn-create-project-top')?.addEventListener('click', openCreateModal);
+  document.getElementById('btn-create-project-header')?.addEventListener('click', openCreateModal);
+  document.getElementById('btn-create-first-project')?.addEventListener('click', openCreateModal);
+
+  // Close Form Modal
+  document.getElementById('btn-close-form-modal')?.addEventListener('click', () => {
+    state.formModal.isOpen = false;
+    render();
+  });
+  document.getElementById('btn-cancel-form-modal')?.addEventListener('click', () => {
+    state.formModal.isOpen = false;
+    render();
+  });
+
+  // Project Edit buttons
+  document.querySelectorAll('.btn-edit-project').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      state.formModal = {
+        isOpen: true,
+        mode: 'edit',
+        projectId: p.id,
+        data: {
+          name: p.name,
+          repo_url: p.repo_url,
+          branch: p.branch,
+          port_manual: p.port_manual ? String(p.port_manual) : '',
+          build_cmd: p.build_cmd,
+          start_cmd: p.start_cmd,
+          auto_start: p.auto_start,
+          env_vars: p.env_vars ? p.env_vars.map((ev) => ({ key: ev.key, value: ev.value })) : [],
+        },
+        isSaving: false,
+        error: null,
+      };
+      render();
+    });
+  });
+
+  // Project Delete buttons
+  document.querySelectorAll('.btn-delete-project').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      state.deleteModal = {
+        isOpen: true,
+        project: p,
+        isDeleting: false,
+        error: null,
+      };
+      render();
+    });
+  });
+
+  // Delete modal cancel & confirm
+  document.getElementById('btn-cancel-delete')?.addEventListener('click', () => {
+    state.deleteModal.isOpen = false;
+    render();
+  });
+
+  document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
+    if (!state.deleteModal.project) return;
+    state.deleteModal.isDeleting = true;
+    render();
+
+    try {
+      await deleteProject(state.deleteModal.project.id);
+      state.deleteModal.isOpen = false;
+      await loadProjects();
+    } catch (err: any) {
+      state.deleteModal.isDeleting = false;
+      state.deleteModal.error = String(err);
+      render();
+    }
+  });
+
+  // Form Modal inputs change sync
+  const inputName = document.getElementById('input-project-name') as HTMLInputElement | null;
+  const inputRepo = document.getElementById('input-repo-url') as HTMLInputElement | null;
+  const inputBranch = document.getElementById('input-branch') as HTMLInputElement | null;
+  const inputPort = document.getElementById('input-port') as HTMLInputElement | null;
+  const inputBuild = document.getElementById('input-build-cmd') as HTMLInputElement | null;
+  const inputStart = document.getElementById('input-start-cmd') as HTMLInputElement | null;
+  const inputAutoStart = document.getElementById('input-auto-start') as HTMLInputElement | null;
+
+  if (inputName) inputName.oninput = (e) => (state.formModal.data.name = (e.target as HTMLInputElement).value);
+  if (inputRepo) inputRepo.oninput = (e) => (state.formModal.data.repo_url = (e.target as HTMLInputElement).value);
+  if (inputBranch) inputBranch.oninput = (e) => (state.formModal.data.branch = (e.target as HTMLInputElement).value);
+  if (inputPort) inputPort.oninput = (e) => (state.formModal.data.port_manual = (e.target as HTMLInputElement).value);
+  if (inputBuild) inputBuild.oninput = (e) => (state.formModal.data.build_cmd = (e.target as HTMLInputElement).value);
+  if (inputStart) inputStart.oninput = (e) => (state.formModal.data.start_cmd = (e.target as HTMLInputElement).value);
+  if (inputAutoStart) inputAutoStart.onchange = (e) => (state.formModal.data.auto_start = (e.target as HTMLInputElement).checked);
+
+  // Env inputs sync
+  document.querySelectorAll('.env-key-input').forEach((el) => {
+    const idx = Number(el.getAttribute('data-index'));
+    (el as HTMLInputElement).oninput = (e) => {
+      state.formModal.data.env_vars[idx].key = (e.target as HTMLInputElement).value;
+    };
+  });
+  document.querySelectorAll('.env-val-input').forEach((el) => {
+    const idx = Number(el.getAttribute('data-index'));
+    (el as HTMLInputElement).oninput = (e) => {
+      state.formModal.data.env_vars[idx].value = (e.target as HTMLInputElement).value;
+    };
+  });
+
+  // Add Env Row
+  document.getElementById('btn-add-env-row')?.addEventListener('click', () => {
+    state.formModal.data.env_vars.push({ key: '', value: '' });
+    render();
+  });
+
+  // Remove Env Row
+  document.querySelectorAll('.env-remove-btn').forEach((el) => {
+    el.addEventListener('click', () => {
+      const idx = Number(el.getAttribute('data-index'));
+      state.formModal.data.env_vars.splice(idx, 1);
+      render();
+    });
+  });
+
+  // Save Project
+  document.getElementById('btn-save-project')?.addEventListener('click', async () => {
+    const d = state.formModal.data;
+    const name = d.name.trim();
+    const repo_url = d.repo_url.trim();
+
+    if (!name) {
+      state.formModal.error = 'Nama project tidak boleh kosong';
+      render();
+      return;
+    }
+
+    if (!repo_url) {
+      state.formModal.error = 'Repository URL tidak boleh kosong';
+      render();
+      return;
+    }
+
+    state.formModal.isSaving = true;
+    state.formModal.error = null;
+    render();
+
+    try {
+      const portNum = d.port_manual.trim() ? Number(d.port_manual.trim()) : null;
+      const validEnvs = d.env_vars.filter((ev) => ev.key.trim().length > 0);
+
+      if (state.formModal.mode === 'create') {
+        await createProject({
+          name,
+          repo_url,
+          branch: d.branch.trim() || 'main',
+          port_manual: portNum,
+          build_cmd: d.build_cmd.trim() || 'npm install',
+          start_cmd: d.start_cmd.trim() || 'npm start',
+          auto_start: d.auto_start,
+          env_vars: validEnvs,
+        });
+      } else if (state.formModal.projectId) {
+        await updateProject(state.formModal.projectId, {
+          repo_url,
+          branch: d.branch.trim() || 'main',
+          port_manual: portNum,
+          build_cmd: d.build_cmd.trim() || 'npm install',
+          start_cmd: d.start_cmd.trim() || 'npm start',
+          auto_start: d.auto_start,
+          env_vars: validEnvs,
+        });
+      }
+
+      state.formModal.isOpen = false;
+      await loadProjects();
+    } catch (err: any) {
+      state.formModal.isSaving = false;
+      state.formModal.error = String(err);
+      render();
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// DATA LOADERS & INITIALIZATION
+// -------------------------------------------------------------
+async function loadProjects() {
+  state.isLoadingProjects = true;
+  try {
+    const list = await listProjects();
+    state.projects = list;
+    state.projectsError = null;
   } catch (err: any) {
-    state.probeStatus = 'failed';
-    state.probeError = String(err?.message || err);
+    state.projectsError = String(err);
   } finally {
+    state.isLoadingProjects = false;
     render();
   }
 }
 
-// Inisialisasi listener event setup progress & status awal
-onSetupProgress((progress) => {
-  state.setupProgress = progress;
-  if (progress.step === 'error') {
-    state.setupStatus = 'error';
-    state.setupError = progress.message;
-  }
+async function init() {
   render();
-});
 
-render();
-handlePing();
-handleCheckSetup();
+  // Load language setting
+  try {
+    const savedLang = await getSetting('language');
+    if (savedLang === 'id' || savedLang === 'en') {
+      state.language = savedLang;
+    }
+  } catch (e) {
+    console.error('Failed to load language setting:', e);
+  }
+
+  // Check setup status
+  try {
+    const status = await checkSetupStatus();
+    state.setupInfo = status;
+  } catch (e) {
+    console.error('Failed to check setup status:', e);
+  }
+
+  // Load projects
+  await loadProjects();
+}
+
+init();

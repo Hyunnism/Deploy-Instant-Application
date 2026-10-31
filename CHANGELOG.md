@@ -3,6 +3,30 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [0.4.0] - 2026-10-31
+### Ditambahkan
+- **Fase 3 — Data Project dan Dashboard (Tanpa Eksekusi)**:
+  - Database embedded SQLite menggunakan `rusqlite 0.31` (fitur `bundled`, nol dependensi eksternal sistem host) dengan foreign keys, mode WAL, dan migrasi schema PRD 8.4 (`projects`, `env_vars`, `settings`).
+  - Lapisan data `storage::db::Database` dengan validasi keamanan ketat:
+    - Nama project: alphanumeric + dash/underscore, anti-shell injection (menolak `;`, `&`, `|`, `..`, spasi).
+    - Repo URL: protokol HTTPS/HTTP/Git valid, menolak karakter berbahaya.
+    - Branch: format git ref valid tanpa traversal.
+    - Port internal: validasi port non-root 1024–65535.
+    - Environment variables: key identifier standar (`^[a-zA-Z_][a-zA-Z0-9_]*$`).
+  - Perintah IPC Tauri di `commands::project.rs`:
+    - `project_create`, `project_list`, `project_get`, `project_update`, `project_delete`.
+    - `setting_get`, `setting_set`, `setting_list`.
+  - Desain antarmuka modern adaptasi referensi visual "Open Pi":
+    - Palet warna light off-white `#f4f5f8`, kartu rounded white `#ffffff` dengan border halus dan soft elevation shadow.
+    - Top navigation bar: tombol Settings, judul app, pintasan Diagnostik, dan tombol buat project.
+    - Overview card: Engine status pill (`Healthy` / `Siap`), subjudul toolchain, serta 3-kolom metrik ringkas (Status, Total Project Aktif, Ruang Rootfs ~343 MB).
+    - Project Card: inisial ikon dinamis, nama project, badge branch, badge port, badge auto-start, baris repo Git monospace, ringkasan perintah build/start, serta aksi Ubah dan Hapus.
+    - Empty state elegan: ikon folder, deskripsi edukasi, dan tombol tambah project pertama.
+    - Form modal bergaya bottom sheet modern: pengelompokan kartu (Informasi Repository, Konfigurasi Eksekusi, Environment Variables editor) dan footer aksi sticky.
+    - Modal dialog konfirmasi hapus berperingatan jelas dengan aksi destruktif aman.
+    - Pengaturan aplikasi: selector dwibahasa (Bahasa Indonesia & English) yang tersimpan persisten di SQLite, informasi versi, dan pintasan diagnostik sistem.
+  - Verifikasi langsung di HP fisik (`462a07fa0405`): Create, Read, Update, Delete, Persistence saat restart app (`force-stop`), dan Language switch lolos 100%.
+
 ## [0.3.0] - 2026-10-31
 ### Ditambahkan
 - **Fase 2 — Rootfs Lengkap dan Setup Pertama**:

@@ -26,6 +26,7 @@ tauri-plugin-log = "2"
 tokio = { version = "1", features = ["process"] }
 sha2 = "0.10"
 libc = "0.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"

@@ -40,6 +40,54 @@ export interface SetupVerificationResult {
   error?: string | null;
 }
 
+export interface EnvVarItem {
+  key: string;
+  value: string;
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  repo_url: string;
+  branch: string;
+  build_cmd: string;
+  start_cmd: string;
+  port_manual?: number | null;
+  auto_start: boolean;
+  last_build_ok?: boolean | null;
+  last_build_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  env_vars?: EnvVarItem[] | null;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  repo_url: string;
+  branch?: string;
+  build_cmd?: string;
+  start_cmd?: string;
+  port_manual?: number | null;
+  auto_start?: boolean;
+  env_vars?: EnvVarItem[];
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  repo_url?: string;
+  branch?: string;
+  build_cmd?: string;
+  start_cmd?: string;
+  port_manual?: number | null;
+  auto_start?: boolean;
+  env_vars?: EnvVarItem[];
+}
+
+export interface SettingItem {
+  key: string;
+  value: string;
+}
+
 /**
  * Satu-satunya tempat memanggil invoke() sesuai aturan PRD 12A.2.
  */
@@ -69,4 +117,37 @@ export async function onSetupProgress(
   return await listen<SetupProgress>('setup-progress', (event) => {
     callback(event.payload);
   });
+}
+
+// Fase 3 Project CRUD & Settings
+export async function listProjects(): Promise<Project[]> {
+  return await invoke<Project[]>('project_list');
+}
+
+export async function getProject(id: number): Promise<Project> {
+  return await invoke<Project>('project_get', { id });
+}
+
+export async function createProject(input: CreateProjectInput): Promise<Project> {
+  return await invoke<Project>('project_create', { input });
+}
+
+export async function updateProject(id: number, input: UpdateProjectInput): Promise<Project> {
+  return await invoke<Project>('project_update', { id, input });
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  return await invoke<void>('project_delete', { id });
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+  return await invoke<string | null>('setting_get', { key });
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  return await invoke<void>('setting_set', { key, value });
+}
+
+export async function listSettings(): Promise<SettingItem[]> {
+  return await invoke<SettingItem[]>('setting_list');
 }
