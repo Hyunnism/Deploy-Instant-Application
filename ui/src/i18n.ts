@@ -73,6 +73,10 @@ export const translations = {
     engineInstalledDesc: 'Seluruh dependensi utama siap menjalankan aplikasi Node.js mandiri.',
     viewDetailPill: 'Detail ›',
     installActionPill: 'Pasang ›',
+    recentLogsTitle: 'Log Terminal Aktivitas',
+    copyLogsBtn: 'Salin',
+    logsCopied: 'Disalin!',
+    noRecentLogs: 'Belum ada log instalasi.',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Hapus Project?',
@@ -165,6 +169,10 @@ export const translations = {
     engineInstalledDesc: 'All primary dependencies are ready to execute Node.js applications autonomously.',
     viewDetailPill: 'Details ›',
     installActionPill: 'Install ›',
+    recentLogsTitle: 'Recent Terminal Logs',
+    copyLogsBtn: 'Copy',
+    logsCopied: 'Copied!',
+    noRecentLogs: 'No installation logs yet.',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Delete Project?',

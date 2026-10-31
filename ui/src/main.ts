@@ -33,6 +33,21 @@ function cleanVer(v: string | undefined | null, fallback: string): string {
   return last.length > 20 ? last.slice(0, 18) + '...' : last;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function addEngineLog(msg: string) {
+  const d = new Date();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+  state.engineLogs.push(`[${time}] ${msg}`);
+}
+
 // -------------------------------------------------------------
 // RENDER CONTROLLER
 // -------------------------------------------------------------
@@ -561,6 +576,27 @@ function renderEngineModal(): string {
               : ''
           }
 
+          <!-- Terminal Logs (Ref 2 Recent Logs Style) -->
+          <div class="engine-logs-section">
+            <div class="engine-logs-header">
+              <span class="engine-logs-title">${t('recentLogsTitle')}</span>
+              <button class="engine-logs-copy" id="btn-copy-engine-logs">${t('copyLogsBtn')}</button>
+            </div>
+            <div class="engine-logs-box" id="engine-logs-content">
+              ${
+                state.engineLogs.length > 0
+                  ? state.engineLogs.map((line) => {
+                      let cls = 'step';
+                      if (line.includes('[OK]') || line.includes('selesai') || line.includes('ready') || line.includes('berhasil') || line.includes('sehat')) cls = 'success';
+                      else if (line.includes('WARN') || line.includes('peringatan')) cls = 'warn';
+                      else if (line.includes('ERR') || line.includes('gagal') || line.includes('error')) cls = 'error';
+                      return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+                    }).join('')
+                  : `<div class="log-line muted">${t('noRecentLogs')}</div>`
+              }
+            </div>
+          </div>
+
           <!-- Info text -->
           <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.45; padding: 2px 4px;">
             ${isReady ? t('engineInstalledDesc') : t('engineNotInstalled')}
@@ -671,6 +707,10 @@ function attachEventListeners() {
   document.getElementById('card-instant-engine')?.addEventListener('click', () => {
     state.engineModal.isOpen = true;
     render();
+    setTimeout(() => {
+      const logBox = document.getElementById('engine-logs-content');
+      if (logBox) logBox.scrollTop = logBox.scrollHeight;
+    }, 50);
   });
 
   document.getElementById('btn-close-engine-modal')?.addEventListener('click', () => {
@@ -683,14 +723,32 @@ function attachEventListeners() {
     render();
   });
 
+  document.getElementById('btn-copy-engine-logs')?.addEventListener('click', async () => {
+    const text = state.engineLogs.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('btn-copy-engine-logs');
+      if (btn) btn.textContent = t('logsCopied');
+      setTimeout(() => {
+        if (btn) btn.textContent = t('copyLogsBtn');
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
   document.getElementById('btn-start-engine-setup')?.addEventListener('click', async () => {
     state.setupStatus = 'extracting';
+    addEngineLog('Memulai pemasangan lingkungan server mandiri...');
     render();
 
     try {
       const unlisten = await onSetupProgress((p) => {
         state.setupProgress = p;
+        addEngineLog(`[${p.step}] ${p.message} (${p.percent}%)`);
         render();
+        const logBox = document.getElementById('engine-logs-content');
+        if (logBox) logBox.scrollTop = logBox.scrollHeight;
       });
 
       const res = await startSetup();
@@ -698,15 +756,29 @@ function attachEventListeners() {
       state.setupVerification = res;
       state.setupStatus = res.success ? 'ready' : 'error';
       state.setupInfo = await checkSetupStatus();
+
+      if (res.success) {
+        addEngineLog(`[Node.js] ${cleanVer(res.node_version, 'v24.22.1 LTS')} [OK]`);
+        addEngineLog(`[PM2] ${cleanVer(res.pm2_version, '7.1.1')} [OK]`);
+        addEngineLog(`[Cloudflared] ${cleanVer(res.cloudflared_version, '2026.10.7')} [OK]`);
+        addEngineLog(`[Git] ${cleanVer(res.git_version, '2.39.5')} [OK]`);
+        addEngineLog('Lingkungan server siap digunakan sepenuhnya! [OK]');
+      } else {
+        addEngineLog(`[ERROR] Verifikasi toolchain gagal: ${res.error || 'Unknown error'}`);
+      }
     } catch (err: any) {
       state.setupStatus = 'error';
       state.setupError = String(err);
+      addEngineLog(`[ERROR] Ekstraksi gagal: ${String(err)}`);
     }
     render();
+    const logBox = document.getElementById('engine-logs-content');
+    if (logBox) logBox.scrollTop = logBox.scrollHeight;
   });
 
   document.getElementById('btn-reverify-engine')?.addEventListener('click', async () => {
     state.setupStatus = 'verifying';
+    addEngineLog('Memeriksa ulang integritas & versi toolchain container...');
     render();
 
     try {
@@ -714,10 +786,23 @@ function attachEventListeners() {
       state.setupVerification = res;
       state.setupStatus = res.success ? 'ready' : 'error';
       state.setupInfo = await checkSetupStatus();
+
+      if (res.success) {
+        addEngineLog(`[Node.js] ${cleanVer(res.node_version, 'v24.22.1 LTS')} [OK]`);
+        addEngineLog(`[PM2] ${cleanVer(res.pm2_version, '7.1.1')} [OK]`);
+        addEngineLog(`[Cloudflared] ${cleanVer(res.cloudflared_version, '2026.10.7')} [OK]`);
+        addEngineLog(`[Git] ${cleanVer(res.git_version, '2.39.5')} [OK]`);
+        addEngineLog('Verifikasi selesai! Seluruh toolchain dalam kondisi sehat. [OK]');
+      } else {
+        addEngineLog(`[WARN] Toolchain tidak lengkap: ${res.error || 'Unknown error'}`);
+      }
     } catch (err: any) {
       state.setupStatus = 'error';
+      addEngineLog(`[ERROR] Pemeriksaan gagal: ${String(err)}`);
     }
     render();
+    const logBox = document.getElementById('engine-logs-content');
+    if (logBox) logBox.scrollTop = logBox.scrollHeight;
   });
 
   // Project Create buttons

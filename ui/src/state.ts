@@ -55,6 +55,7 @@ export interface AppState {
   engineModal: {
     isOpen: boolean;
   };
+  engineLogs: string[];
 
   // Fase 1 Probe State
   lastPing: PingResponse | null;
@@ -110,6 +111,7 @@ export const state: AppState = {
   engineModal: {
     isOpen: false,
   },
+  engineLogs: [],
 
   lastPing: null,
   latencyMs: null,
