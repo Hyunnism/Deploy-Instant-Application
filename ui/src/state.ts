@@ -71,6 +71,35 @@ export interface AppState {
   setupProgress: SetupProgress | null;
   setupVerification: SetupVerificationResult | null;
   setupError: string | null;
+
+  // Fase 4 Git & PAT State
+  repoStatuses: Record<
+    number,
+    {
+      is_cloned: boolean;
+      commit_hash?: string | null;
+      commit_message?: string | null;
+      branch?: string | null;
+      isCloning?: boolean;
+      isPulling?: boolean;
+    }
+  >;
+  gitLogModal: {
+    isOpen: boolean;
+    projectId: number | null;
+    projectName: string;
+    logs: string[];
+    isRunning: boolean;
+    statusMessage?: string | null;
+  };
+  patSettings: {
+    hasPat: boolean;
+    inputPat: string;
+    showPat: boolean;
+    isSaving: boolean;
+    error: string | null;
+    successMessage: string | null;
+  };
 }
 
 export const defaultFormData: ProjectFormData = {
@@ -125,4 +154,23 @@ export const state: AppState = {
   setupProgress: null,
   setupVerification: null,
   setupError: null,
+
+  // Fase 4
+  repoStatuses: {},
+  gitLogModal: {
+    isOpen: false,
+    projectId: null,
+    projectName: '',
+    logs: [],
+    isRunning: false,
+    statusMessage: null,
+  },
+  patSettings: {
+    hasPat: false,
+    inputPat: '',
+    showPat: false,
+    isSaving: false,
+    error: null,
+    successMessage: null,
+  },
 };

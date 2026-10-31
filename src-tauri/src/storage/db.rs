@@ -713,6 +713,19 @@ impl Database {
         Ok(())
     }
 
+    /// Hapus nilai setting berdasarkan key
+    pub fn delete_setting(&self, key: &str) -> Result<(), AppError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        conn.execute("DELETE FROM settings WHERE key = ?1;", params![key])
+            .map_err(|e| AppError::Internal(format!("Gagal menghapus setting: {e}")))?;
+
+        Ok(())
+    }
+
     /// Ambil semua setting
     pub fn list_settings(&self) -> Result<Vec<SettingItem>, AppError> {
         let conn = self

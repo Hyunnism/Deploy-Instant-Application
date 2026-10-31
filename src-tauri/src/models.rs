@@ -110,3 +110,34 @@ pub struct SetupVerificationResult {
     pub disk_used_mb: u64,
     pub error: Option<String>,
 }
+
+/// Git realtime streaming log event (PRD Bagian 13 Fase 4)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitLogEvent {
+    pub project_id: i64,
+    pub line: String,
+    pub stream: String, // "stdout" | "stderr"
+}
+
+/// Status repositori Git lokal per project (PRD Bagian 13 Fase 4)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoStatus {
+    pub is_cloned: bool,
+    pub commit_hash: Option<String>,
+    pub commit_message: Option<String>,
+    pub branch: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Hasil eksekusi Git pull (PRD Bagian 13 Fase 4)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PullResult {
+    pub updated: bool,
+    pub summary: String,
+}
+
+/// Status konfigurasi PAT GitHub (PRD Bagian 12A.3 & 13 Fase 4)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatStatus {
+    pub has_pat: bool,
+}

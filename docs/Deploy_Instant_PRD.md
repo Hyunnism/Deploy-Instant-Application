@@ -636,19 +636,19 @@ deploy-instant/
 **Fokus:** hanya pengambilan repository.
 
 **Checklist Kode**
-- [ ] `project.rs::clone()` memakai `git clone --depth 1 --branch <b>` ke `/app/<name>`.
-- [ ] Streaming output ke UI lewat event.
-- [ ] `secrets.rs`: enkripsi dengan Android Keystore; simpan PAT di Pengaturan.
-- [ ] Suntikan PAT via `GIT_ASKPASS` atau header sementara; **PAT tidak boleh muncul di log/proses list**.
-- [ ] `project.rs::pull()` (`git pull`) dan deteksi perubahan.
-- [ ] Pembersihan folder bila clone gagal.
+- [x] `project.rs::clone()` memakai `git clone --depth 1 --branch <b>` ke `/app/<name>`.
+- [x] Streaming output ke UI lewat event.
+- [x] `secrets.rs`: enkripsi dengan Android Keystore / AES-256-GCM; simpan PAT di Pengaturan.
+- [x] Suntikan PAT via `GIT_ASKPASS` atau header sementara; **PAT tidak boleh muncul di log/proses list**.
+- [x] `project.rs::pull()` (`git pull`) dan deteksi perubahan.
+- [x] Pembersihan folder bila clone gagal.
 
 **Checklist Pengujian**
-- [ ] Clone repo publik berhasil.
-- [ ] Clone repo private dengan PAT valid berhasil; PAT salah menghasilkan pesan jelas.
-- [ ] Branch tidak ada: error jelas.
-- [ ] PAT tidak ditemukan di log, `ps`, atau file plaintext (audit).
-- [ ] Pull setelah ada commit baru berhasil.
+- [x] Clone repo publik berhasil.
+- [x] Clone repo private dengan PAT valid berhasil; PAT salah menghasilkan pesan jelas.
+- [x] Branch tidak ada: error jelas.
+- [x] PAT tidak ditemukan di log, `ps`, atau file plaintext (audit).
+- [x] Pull setelah ada commit baru berhasil.
 
 **Kriteria selesai:** repo publik dan private dapat di-clone dan di-pull dari UI.
 

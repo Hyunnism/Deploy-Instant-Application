@@ -3,6 +3,31 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [0.5.0] - 2026-10-31
+### Ditambahkan
+- **Fase 4 — Clone dan Pull dari GitHub**:
+  - Eksekusi Git aman di container Linux sandbox sandbox melalui `core::exec::proot_exec()`:
+    - `git clone --depth 1 --branch <branch> <repo_url> /app/<project_name>` ke direktori isolasi container `/app/<project_name>`.
+    - `git pull origin <branch>` dengan parsing perubahan commit otomatis (*"Already up to date"* vs *"Pembaruan kode berhasil diambil"*).
+    - Inspeksi status repositori lokal `get_project_repo_status`: deteksi keberadaan `.git`, commit hash pendek terkini (`git rev-parse --short HEAD`), commit message (`git log -1 --pretty=%s`), dan nama branch aktif.
+  - Streaming stdout & stderr real-time ke antarmuka aplikasi melalui event Tauri `git:log`.
+  - Mekanisme keamanan kredensial zero-leakage (PRD Bagian 12A.3):
+    - Penyimpanan GitHub Personal Access Token (PAT) terenkripsi AES-256-GCM menggunakan master key 256-bit dan 96-bit random nonce di `storage::secrets.rs`.
+    - Injeksi kredensial Git aman via helper `GIT_ASKPASS` berumur pendek di `/tmp/.git_askpass_<timestamp>.sh` dengan izin POSIX `0700` dan pembersihan otomatis saat proses selesai (`Drop`).
+    - URL repositori di `.git/config`, command string, dan daftar proses `ps` selalu bersih tanpa username/token.
+    - Sanitasi otomatis output log: token PAT dan URL berotentikasi disamarkan dengan `******`.
+  - Pembersihan otomatis pada kegagalan: folder `/app/<project_name>` langsung dihapus bersih secara rekursif bila proses clone terputus atau gagal, mencegah residu direktori korup.
+  - Antarmuka Terminal Git dan Pengaturan Kredensial:
+    - Tombol aksi kontekstual pada Kartu Project: Tombol biru "Clone Repo" saat repositori belum diunduh, otomatis berganti menjadi tombol "Pull" saat repositori sudah terkloning.
+    - Badge metadata Git: badge commit hash (misal `#d0dd1f6`), branch, dan ringkasan pesan commit terakhir.
+    - Modal Log Terminal Git streaming real-time dengan status eksekusi, warna terminal log, tombol "Salin Log", dan opsi tutup.
+    - Bagian GitHub PAT di menu Pengaturan: status konfigurasi (Terkonfigurasi Aktif / Belum Diatur), input token tersamar dengan tombol toggle mata (lihat/sembunyikan), tombol Simpan Token dan Hapus Token, serta panduan scope `repo`.
+  - Pengujian langsung di perangkat fisik Android (`462a07fa0405`):
+    - Clone repo publik `octocat/Spoon-Knife` sukses 100% dengan streaming log real-time.
+    - Pembersihan otomatis direktori saat branch salah/gagal clone terverifikasi 100% bersih tanpa residu.
+    - Enkripsi PAT di SQLite diperiksa langsung via adb shell: nilai tersimpan berupa hex AES-256-GCM, zero plaintext.
+    - Git pull mendeteksi status *"Already up to date"* secara akurat.
+
 ## [0.4.0] - 2026-10-31
 ### Ditambahkan
 - **Fase 3 — Data Project dan Dashboard (Tanpa Eksekusi)**:

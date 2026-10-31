@@ -1,19 +1,28 @@
 // main.ts
 // Deploy Instant - Modern Clean UI (Open Pi Reference Adaptation)
+// Fase 1-4: Diagnostics, Setup Engine, Projects CRUD, Git Clone & Pull, PAT Management
 
 import './styles/index.css';
 import {
   checkSetupStatus,
+  cloneProject,
   createProject,
+  deletePat,
   deleteProject,
+  getPatStatus,
+  getRepoStatus,
   getSetting,
   listProjects,
+  onGitLog,
   onSetupProgress,
+  pullProject,
   runProotProbe,
+  savePat,
   setSetting,
   startSetup,
   updateProject,
   verifySetup,
+  type GitLogEvent,
   type Project,
 } from './api';
 import { translations, type TranslationKey } from './i18n';
@@ -46,6 +55,12 @@ function addEngineLog(msg: string) {
   const d = new Date();
   const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   state.engineLogs.push(`[${time}] ${msg}`);
+}
+
+function addGitLog(msg: string) {
+  const d = new Date();
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+  state.gitLogModal.logs.push(`[${time}] ${msg}`);
 }
 
 // -------------------------------------------------------------
@@ -85,6 +100,7 @@ function render() {
       ${renderFormModal()}
       ${renderDeleteModal()}
       ${renderEngineModal()}
+      ${renderGitLogModal()}
     </div>
   `;
 
@@ -164,6 +180,8 @@ function renderEmptyState(): string {
 function renderProjectCard(p: Project): string {
   const initial = (p.name.charAt(0) || 'P').toUpperCase();
   const portLabel = p.port_manual ? `Port ${p.port_manual}` : 'Port Auto';
+  const repo = state.repoStatuses[p.id];
+  const isCloned = repo?.is_cloned ?? false;
 
   return `
     <div class="project-card" data-id="${p.id}">
@@ -173,12 +191,26 @@ function renderProjectCard(p: Project): string {
           <div class="project-name">${p.name}</div>
         </div>
         <div class="project-card-actions">
+          ${
+            !isCloned
+              ? `<button class="proj-action-btn clone btn-clone-project" data-id="${p.id}" ${repo?.isCloning ? 'disabled' : ''}>
+                   ${repo?.isCloning ? t('cloningRepo') : t('cloneRepoBtn')}
+                 </button>`
+              : `<button class="proj-action-btn pull btn-pull-project" data-id="${p.id}" ${repo?.isPulling ? 'disabled' : ''}>
+                   ${repo?.isPulling ? t('pullingRepo') : t('pullBtn')}
+                 </button>`
+          }
           <button class="proj-action-btn edit btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
           <button class="proj-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
         </div>
       </div>
 
       <div class="project-meta-row">
+        ${
+          isCloned && repo?.commit_hash
+            ? `<span class="meta-badge commit-hash">#${repo.commit_hash}</span>`
+            : `<span class="meta-badge not-cloned" style="color: #94a3b8; font-style: italic;">${t('notClonedBadge')}</span>`
+        }
         <span class="meta-badge">
           <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="6" y1="3" x2="6" y2="15"></line>
@@ -205,6 +237,11 @@ function renderProjectCard(p: Project): string {
                </span>`
             : ''
         }
+        ${
+          isCloned && repo?.commit_message
+            ? `<span class="meta-badge commit-msg" title="${escapeHtml(repo.commit_message)}">${escapeHtml(repo.commit_message)}</span>`
+            : ''
+        }
       </div>
 
       <div class="project-repo-line">
@@ -229,9 +266,11 @@ function renderProjectCard(p: Project): string {
 }
 
 // -------------------------------------------------------------
-// SETTINGS VIEW
+// SETTINGS VIEW (WITH GITHUB PAT MANAGEMENT)
 // -------------------------------------------------------------
 function renderSettingsView(): string {
+  const pat = state.patSettings;
+
   return `
     <section class="section-header">
       <h3 class="section-title">${t('settingsTitle')}</h3>
@@ -241,6 +280,58 @@ function renderSettingsView(): string {
     </section>
 
     <div class="settings-group">
+      <!-- GitHub Personal Access Token (PAT) Section -->
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('gitPatSection')}</h2>
+          <div class="overview-subtitle">
+            <span class="status-badge ${pat.hasPat ? 'healthy' : 'warning'}" style="margin-top: 4px; display: inline-flex;">
+              ${pat.hasPat ? t('gitPatStatusConfigured') : t('gitPatStatusNotSet')}
+            </span>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-top: 6px;">
+          <div class="pat-input-wrapper">
+            <input 
+              type="${pat.showPat ? 'text' : 'password'}" 
+              id="input-github-pat" 
+              class="form-input mono" 
+              autocapitalize="none" 
+              autocorrect="off" 
+              spellcheck="false" 
+              autocomplete="off" 
+              placeholder="${t('gitPatPlaceholder')}" 
+              value="${pat.inputPat}" 
+            />
+            <button class="pat-eye-btn" id="btn-toggle-pat-visibility" title="Tampilkan / Sembunyikan">
+              ${pat.showPat ? '👁️' : '🙈'}
+            </button>
+          </div>
+        </div>
+
+        ${pat.error ? `<div class="modal-alert error" style="margin-top: 4px;">${pat.error}</div>` : ''}
+        ${pat.successMessage ? `<div class="modal-alert success" style="margin-top: 4px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0;">${pat.successMessage}</div>` : ''}
+
+        <div class="pat-actions">
+          <button class="modal-btn primary" id="btn-save-pat" style="flex: 1;" ${pat.isSaving ? 'disabled' : ''}>
+            ${pat.isSaving ? 'Menyimpan...' : t('gitPatSaveBtn')}
+          </button>
+          ${
+            pat.hasPat
+              ? `<button class="modal-btn danger" id="btn-delete-pat">
+                   ${t('gitPatDeleteBtn')}
+                 </button>`
+              : ''
+          }
+        </div>
+
+        <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin-top: 2px;">
+          ${t('gitPatHelpText')}
+        </p>
+      </div>
+
+      <!-- Language Section -->
       <div class="settings-card">
         <div class="overview-title-group">
           <h2>${t('languageSection')}</h2>
@@ -255,17 +346,18 @@ function renderSettingsView(): string {
         </div>
       </div>
 
+      <!-- About Section -->
       <div class="settings-card">
         <div class="overview-title-group">
           <h2>${t('aboutSection')}</h2>
         </div>
         <div class="settings-row">
           <span class="metric-label">${t('appVersion')}</span>
-          <span class="metric-val" style="font-size: 0.88rem;">v0.4.0 (Fase 3)</span>
+          <span class="metric-val" style="font-size: 0.88rem;">v0.5.0 (Fase 4 - Git Engine)</span>
         </div>
         <div class="settings-row">
           <span class="metric-label">${t('engineRuntime')}</span>
-          <span class="metric-val" style="font-size: 0.88rem;">Node v24.22.1 LTS + PM2</span>
+          <span class="metric-val" style="font-size: 0.88rem;">Node v24.22.1 LTS + PM2 + Git</span>
         </div>
         <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-top: 4px;">
           ${t('zeroLaptopNotice')}
@@ -626,6 +718,59 @@ function renderEngineModal(): string {
 }
 
 // -------------------------------------------------------------
+// GIT LOG TERMINAL MODAL (FASE 4 REALTIME STREAMING)
+// -------------------------------------------------------------
+function renderGitLogModal(): string {
+  const modal = state.gitLogModal;
+  if (!modal.isOpen) return '';
+
+  return `
+    <div class="modal-overlay" id="git-log-modal-overlay">
+      <div class="modal-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title">${t('gitLogsModalTitle')} — ${modal.projectName}</h3>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+              ${modal.isRunning ? 'Sedang mengeksekusi di rootfs container...' : (modal.statusMessage || 'Proses selesai.')}
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-git-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="engine-logs-section" style="margin-top: 0;">
+            <div class="engine-logs-header">
+              <span class="engine-logs-title">${t('gitLogsStreaming')}</span>
+              <button class="engine-logs-copy" id="btn-copy-git-logs">${t('copyLogsBtn')}</button>
+            </div>
+            <div class="engine-logs-box" id="git-logs-content" style="min-height: 220px; max-height: 350px;">
+              ${
+                modal.logs.length > 0
+                  ? modal.logs.map((line) => {
+                      let cls = 'step';
+                      if (line.includes('==> Memulai') || line.includes('Cloning') || line.includes('Receiving objects')) cls = 'step';
+                      else if (line.includes('sukses') || line.includes('terbaru') || line.includes('Pembaruan berhasil') || line.includes('Resolving deltas: 100%')) cls = 'success';
+                      else if (line.includes('error') || line.includes('fatal') || line.includes('gagal') || line.includes('CLEANUP')) cls = 'error';
+                      return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+                    }).join('')
+                  : `<div class="log-line muted">Menunggu output dari Git...</div>`
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn primary" id="btn-footer-close-git-modal" style="width: 100%;">
+            ${modal.isRunning ? 'Tutup Tampilan (Berjalan di Background)' : t('modalClose')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // EVENT LISTENERS & USER ACTIONS
 // -------------------------------------------------------------
 function attachEventListeners() {
@@ -674,6 +819,61 @@ function attachEventListeners() {
     } catch (e) {
       console.error(e);
     }
+  });
+
+  // PAT Management Handlers
+  const inputPatEl = document.getElementById('input-github-pat') as HTMLInputElement | null;
+  if (inputPatEl) {
+    inputPatEl.oninput = (e) => {
+      state.patSettings.inputPat = (e.target as HTMLInputElement).value;
+      state.patSettings.error = null;
+      state.patSettings.successMessage = null;
+    };
+  }
+
+  document.getElementById('btn-toggle-pat-visibility')?.addEventListener('click', () => {
+    state.patSettings.showPat = !state.patSettings.showPat;
+    render();
+  });
+
+  document.getElementById('btn-save-pat')?.addEventListener('click', async () => {
+    const inputPatEl = document.getElementById('input-github-pat') as HTMLInputElement | null;
+    const patVal = (inputPatEl ? inputPatEl.value : state.patSettings.inputPat).trim();
+    if (!patVal) {
+      state.patSettings.error = 'Masukkan token PAT GitHub';
+      render();
+      return;
+    }
+
+    state.patSettings.isSaving = true;
+    state.patSettings.error = null;
+    state.patSettings.successMessage = null;
+    render();
+
+    try {
+      await savePat(patVal);
+      state.patSettings.hasPat = true;
+      state.patSettings.inputPat = '';
+      state.patSettings.successMessage = t('gitPatSavedSuccess');
+    } catch (err: any) {
+      state.patSettings.error = String(err);
+    } finally {
+      state.patSettings.isSaving = false;
+      render();
+    }
+  });
+
+  document.getElementById('btn-delete-pat')?.addEventListener('click', async () => {
+    try {
+      await deletePat();
+      state.patSettings.hasPat = false;
+      state.patSettings.inputPat = '';
+      state.patSettings.successMessage = t('gitPatDeletedSuccess');
+      state.patSettings.error = null;
+    } catch (err: any) {
+      state.patSettings.error = String(err);
+    }
+    render();
   });
 
   // Diagnostics actions
@@ -803,6 +1003,111 @@ function attachEventListeners() {
     render();
     const logBox = document.getElementById('engine-logs-content');
     if (logBox) logBox.scrollTop = logBox.scrollHeight;
+  });
+
+  // Git Modal Handlers
+  const closeGitModal = () => {
+    state.gitLogModal.isOpen = false;
+    render();
+  };
+  document.getElementById('btn-close-git-modal')?.addEventListener('click', closeGitModal);
+  document.getElementById('btn-footer-close-git-modal')?.addEventListener('click', closeGitModal);
+
+  document.getElementById('btn-copy-git-logs')?.addEventListener('click', async () => {
+    const text = state.gitLogModal.logs.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('btn-copy-git-logs');
+      if (btn) btn.textContent = t('logsCopied');
+      setTimeout(() => {
+        if (btn) btn.textContent = t('copyLogsBtn');
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  // Project Clone action
+  document.querySelectorAll('.btn-clone-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      if (!state.repoStatuses[id]) {
+        state.repoStatuses[id] = { is_cloned: false };
+      }
+      state.repoStatuses[id].isCloning = true;
+
+      state.gitLogModal = {
+        isOpen: true,
+        projectId: id,
+        projectName: proj.name,
+        logs: [],
+        isRunning: true,
+        statusMessage: 'Sedang meng-clone repository...',
+      };
+      render();
+
+      try {
+        const repoStatus = await cloneProject(id);
+        state.repoStatuses[id] = {
+          ...repoStatus,
+          isCloning: false,
+        };
+        state.gitLogModal.isRunning = false;
+        state.gitLogModal.statusMessage = 'Repository berhasil di-clone!';
+      } catch (err: any) {
+        state.repoStatuses[id].isCloning = false;
+        state.gitLogModal.isRunning = false;
+        state.gitLogModal.statusMessage = `Clone gagal: ${String(err)}`;
+        addGitLog(`[ERROR] ${String(err)}`);
+      }
+      render();
+      scrollGitLogs();
+    });
+  });
+
+  // Project Pull action
+  document.querySelectorAll('.btn-pull-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      if (!state.repoStatuses[id]) {
+        state.repoStatuses[id] = { is_cloned: true };
+      }
+      state.repoStatuses[id].isPulling = true;
+
+      state.gitLogModal = {
+        isOpen: true,
+        projectId: id,
+        projectName: proj.name,
+        logs: [],
+        isRunning: true,
+        statusMessage: 'Sedang mengambil pembaruan dari remote...',
+      };
+      render();
+
+      try {
+        const pullRes = await pullProject(id);
+        const repoStatus = await getRepoStatus(id);
+        state.repoStatuses[id] = {
+          ...repoStatus,
+          isPulling: false,
+        };
+        state.gitLogModal.isRunning = false;
+        state.gitLogModal.statusMessage = pullRes.summary;
+      } catch (err: any) {
+        state.repoStatuses[id].isPulling = false;
+        state.gitLogModal.isRunning = false;
+        state.gitLogModal.statusMessage = `Pull gagal: ${String(err)}`;
+        addGitLog(`[ERROR] ${String(err)}`);
+      }
+      render();
+      scrollGitLogs();
+    });
   });
 
   // Project Create buttons
@@ -947,9 +1252,22 @@ function attachEventListeners() {
 
   // Save Project
   document.getElementById('btn-save-project')?.addEventListener('click', async () => {
+    const inputName = document.getElementById('input-project-name') as HTMLInputElement | null;
+    const inputRepo = document.getElementById('input-repo-url') as HTMLInputElement | null;
+    const inputBranch = document.getElementById('input-branch') as HTMLInputElement | null;
+    const inputPort = document.getElementById('input-port') as HTMLInputElement | null;
+    const inputBuild = document.getElementById('input-build-cmd') as HTMLInputElement | null;
+    const inputStart = document.getElementById('input-start-cmd') as HTMLInputElement | null;
+    const inputAutoStart = document.getElementById('input-auto-start') as HTMLInputElement | null;
+
     const d = state.formModal.data;
-    const name = d.name.trim();
-    const repo_url = d.repo_url.trim();
+    const name = (inputName ? inputName.value : d.name).trim();
+    const repo_url = (inputRepo ? inputRepo.value : d.repo_url).trim();
+    const branch = (inputBranch ? inputBranch.value : d.branch).trim() || 'main';
+    const portRaw = (inputPort ? inputPort.value : d.port_manual).trim();
+    const build_cmd = (inputBuild ? inputBuild.value : d.build_cmd).trim() || 'npm install';
+    const start_cmd = (inputStart ? inputStart.value : d.start_cmd).trim() || 'npm start';
+    const auto_start = inputAutoStart ? inputAutoStart.checked : d.auto_start;
 
     if (!name) {
       state.formModal.error = 'Nama project tidak boleh kosong';
@@ -968,28 +1286,28 @@ function attachEventListeners() {
     render();
 
     try {
-      const portNum = d.port_manual.trim() ? Number(d.port_manual.trim()) : null;
+      const portNum = portRaw ? Number(portRaw) : null;
       const validEnvs = d.env_vars.filter((ev) => ev.key.trim().length > 0);
 
       if (state.formModal.mode === 'create') {
         await createProject({
           name,
           repo_url,
-          branch: d.branch.trim() || 'main',
+          branch,
           port_manual: portNum,
-          build_cmd: d.build_cmd.trim() || 'npm install',
-          start_cmd: d.start_cmd.trim() || 'npm start',
-          auto_start: d.auto_start,
+          build_cmd,
+          start_cmd,
+          auto_start,
           env_vars: validEnvs,
         });
       } else if (state.formModal.projectId) {
         await updateProject(state.formModal.projectId, {
           repo_url,
-          branch: d.branch.trim() || 'main',
+          branch,
           port_manual: portNum,
-          build_cmd: d.build_cmd.trim() || 'npm install',
-          start_cmd: d.start_cmd.trim() || 'npm start',
-          auto_start: d.auto_start,
+          build_cmd,
+          start_cmd,
+          auto_start,
           env_vars: validEnvs,
         });
       }
@@ -1004,15 +1322,41 @@ function attachEventListeners() {
   });
 }
 
+function scrollGitLogs() {
+  setTimeout(() => {
+    const el = document.getElementById('git-logs-content');
+    if (el) el.scrollTop = el.scrollHeight;
+  }, 40);
+}
+
 // -------------------------------------------------------------
 // DATA LOADERS & INITIALIZATION
 // -------------------------------------------------------------
+async function loadRepoStatuses(projects: Project[]) {
+  for (const p of projects) {
+    try {
+      const st = await getRepoStatus(p.id);
+      state.repoStatuses[p.id] = {
+        ...st,
+        isCloning: false,
+        isPulling: false,
+      };
+    } catch (e) {
+      console.warn(`Failed to get repo status for ${p.name}:`, e);
+    }
+  }
+  render();
+}
+
 async function loadProjects() {
   state.isLoadingProjects = true;
   try {
     const list = await listProjects();
     state.projects = list;
     state.projectsError = null;
+    render();
+    // Refresh repo statuses asynchronously
+    loadRepoStatuses(list);
   } catch (err: any) {
     state.projectsError = String(err);
   } finally {
@@ -1024,6 +1368,19 @@ async function loadProjects() {
 async function init() {
   render();
 
+  // Listen to Git streaming logs
+  try {
+    await onGitLog((ev: GitLogEvent) => {
+      if (state.gitLogModal.isOpen && state.gitLogModal.projectId === ev.project_id) {
+        state.gitLogModal.logs.push(ev.line);
+        render();
+        scrollGitLogs();
+      }
+    });
+  } catch (e) {
+    console.error('Failed to register git:log listener:', e);
+  }
+
   // Load language setting
   try {
     const savedLang = await getSetting('language');
@@ -1032,6 +1389,14 @@ async function init() {
     }
   } catch (e) {
     console.error('Failed to load language setting:', e);
+  }
+
+  // Load PAT status
+  try {
+    const patStatus = await getPatStatus();
+    state.patSettings.hasPat = patStatus.has_pat;
+  } catch (e) {
+    console.error('Failed to get PAT status:', e);
   }
 
   // Check setup status

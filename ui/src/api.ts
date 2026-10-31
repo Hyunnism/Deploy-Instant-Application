@@ -151,3 +151,60 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function listSettings(): Promise<SettingItem[]> {
   return await invoke<SettingItem[]>('setting_list');
 }
+
+// Fase 4: Git Clone, Pull & PAT Management
+export interface RepoStatus {
+  is_cloned: boolean;
+  commit_hash?: string | null;
+  commit_message?: string | null;
+  branch?: string | null;
+  error?: string | null;
+}
+
+export interface PullResult {
+  updated: boolean;
+  summary: string;
+}
+
+export interface GitLogEvent {
+  project_id: number;
+  line: string;
+  stream: string;
+}
+
+export interface PatStatus {
+  has_pat: boolean;
+}
+
+export async function getRepoStatus(id: number): Promise<RepoStatus> {
+  return await invoke<RepoStatus>('project_repo_status', { id });
+}
+
+export async function cloneProject(id: number): Promise<RepoStatus> {
+  return await invoke<RepoStatus>('project_clone', { id });
+}
+
+export async function pullProject(id: number): Promise<PullResult> {
+  return await invoke<PullResult>('project_pull', { id });
+}
+
+export async function savePat(pat: string): Promise<void> {
+  return await invoke<void>('settings_save_pat', { pat });
+}
+
+export async function getPatStatus(): Promise<PatStatus> {
+  return await invoke<PatStatus>('settings_get_pat_status');
+}
+
+export async function deletePat(): Promise<void> {
+  return await invoke<void>('settings_delete_pat');
+}
+
+export async function onGitLog(
+  callback: (log: GitLogEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<GitLogEvent>('git:log', (event) => {
+    callback(event.payload);
+  });
+}
+
