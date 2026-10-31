@@ -283,9 +283,13 @@ Rust: regex → emit event "tunnel_url" → UI tampilkan + Salin/Bagikan
 
 ### 9.1 Peluncuran pertama
 ```
-Buka app → Layar sambutan → "Siapkan lingkungan" → ekstraksi rootfs (progres) →
-cek node -v / pm2 -v / cloudflared -v → Dashboard (kosong) + CTA "Buat project"
+Buka app → Layar sambutan → "Siapkan lingkungan" →
+[Bila rootfs lokal belum ada: Unduh rootfs.tar.gz via internet HP (progres % & MB)] →
+ekstraksi rootfs (progres) → cek node -v / pm2 -v / cloudflared -v → Dashboard (kosong) + CTA "Buat project"
 ```
+
+> **Zero-Laptop Autonomy Guarantee (Prinsip Kemandirian Total):**  
+> Pengguna akhir **sama sekali tidak memerlukan laptop/PC** untuk mengoperasikan Deploy Instant. Saat rilis, jika arsip `rootfs.tar.gz` belum ada di perangkat, aplikasi akan mengunduhnya secara otomatis langsung melalui koneksi internet HP (WiFi/Seluler) dari URL resmi rilis (GitHub Release/CDN), menampilkan progres unduhan dalam MB dan persentase, memvalidasi SHA-256 secara streaming, lalu mengekstraknya. Laptop hanya digunakan oleh developer saat membangun file APK.
 
 ### 9.2 Membuat dan membangun project
 ```
