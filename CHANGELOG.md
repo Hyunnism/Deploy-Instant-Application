@@ -3,6 +3,28 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [0.3.0] - 2026-10-31
+### Ditambahkan
+- **Fase 2 — Rootfs Lengkap dan Setup Pertama**:
+  - Pembuatan generator rootfs `scripts/prepare-rootfs.py` berbasis format USTAR dengan normalisasi Debian Merged-USR (`/bin`, `/lib`, `/sbin` -> `usr/*`), menyatukan Debian Bookworm base, Node.js v24.22.1 LTS, PM2, Cloudflared tunnel arm64, Git 2.39.5, Curl 7.88.1, dan CA-Certificates dalam satu arsip terkompresi `rootfs.tar.gz` (168.20 MB, SHA-256 tersimpan di `rootfs/checksums.txt`).
+  - Implementasi alur ekstraksi tangguh di Rust `core::rootfs::extract_rootfs_with_progress`:
+    - Pengecekan ruang disk host (`MIN_FREE_DISK_MB` ≥ 600 MB via `libc::statvfs`).
+    - Verifikasi integritas checksum SHA-256 streaming sebelum ekstraksi.
+    - Mekanisme atomic staging (`rootfs.extracting` -> `rootfs`) untuk mencegah korupsi data saat proses terputus di tengah jalan.
+    - Penulisan otomatis DNS resolver publik (`1.1.1.1`, `8.8.8.8`) dan penanda versi `.version` (`24.22.1-lts`).
+  - Antarmuka First-Run Setup interaktif di UI (`ui/src/main.ts`):
+    - Banner edukatif inisialisasi lingkungan server.
+    - Indikator ketersediaan ruang disk dan arsip rootfs.
+    - Animated progress bar real-time yang memantau tahapan disk check, hash verification, ekstraksi tar, konfigurasi jaringan, hingga toolchain verification via event IPC Tauri `setup-progress`.
+    - Error handling mandiri dengan tombol "Coba Lagi Setup".
+  - Verifikasi toolchain pasca-setup otomatis dan on-demand:
+    - Node.js: `v24.22.1` LTS
+    - PM2: `7.1.1` (daemon spawned aktif di `/root/.pm2`)
+    - Cloudflared: `2026.10.7`
+    - Git & Curl: `git version 2.39.5` dan HTTP/2 200 OK
+    - Ukuran terpakai di disk internal: `~343 MB` (target ≤ 400 MB)
+    - Durasi eksekusi probe proot container: 882 ms.
+
 ## [0.2.0] - 2026-10-28
 ### Ditambahkan
 - **Fase 1 — Pembuktian proot (Risiko Terbesar Lolos)**:

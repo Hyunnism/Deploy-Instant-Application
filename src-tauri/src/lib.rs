@@ -11,6 +11,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::system_ping,
             commands::system::system_run_probe,
+            commands::setup::setup_check_status,
+            commands::setup::setup_start,
+            commands::setup::setup_verify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

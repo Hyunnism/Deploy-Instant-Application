@@ -39,3 +39,32 @@ pub struct ProbeResult {
     pub elapsed_ms: u64,
     pub error: Option<String>,
 }
+
+/// Setup Status model for Fase 2 (PRD Section 13 Fase 2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupStatus {
+    pub is_ready: bool,
+    pub version: Option<String>,
+    pub free_space_mb: u64,
+    pub required_space_mb: u64,
+}
+
+/// Setup Progress Event payload
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupProgress {
+    pub step: String,
+    pub percent: u8,
+    pub message: String,
+}
+
+/// Setup Verification Result (PRD Section 13 Fase 2)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupVerificationResult {
+    pub success: bool,
+    pub node_version: String,
+    pub pm2_version: String,
+    pub cloudflared_version: String,
+    pub git_version: String,
+    pub disk_used_mb: u64,
+    pub error: Option<String>,
+}

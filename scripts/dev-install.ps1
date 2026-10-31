@@ -35,17 +35,16 @@ Write-Host "==> APK ditemukan: $apkPath" -ForegroundColor Green
 Write-Host "==> Menginstal ke HP fisik via ADB..." -ForegroundColor Cyan
 adb install -r $apkPath
 
-# Pastikan rootfs tersedia di HP untuk pengujian Fase 1
-Write-Host "==> Memverifikasi kesiapan rootfs di HP..." -ForegroundColor Cyan
-$hasNode = adb shell "if [ -f /data/local/tmp/rootfs/usr/local/bin/node ]; then echo 'YES'; else echo 'NO'; fi"
-if ($hasNode -notmatch "YES") {
+# Pastikan arsip rootfs.tar.gz tersedia di HP untuk pengujian Setup Fase 2
+Write-Host "==> Memverifikasi keberadaan arsip rootfs.tar.gz di HP..." -ForegroundColor Cyan
+$hasArchive = adb shell "if [ -f /data/local/tmp/rootfs.tar.gz ]; then echo 'YES'; else echo 'NO'; fi"
+if ($hasArchive -notmatch "YES") {
     $rootfsArchive = "src-tauri/assets/rootfs.tar.gz"
     if (-not (Test-Path $rootfsArchive)) {
         python "$PSScriptRoot\prepare-rootfs.py"
     }
-    Write-Host "==> Mentransfer dan mengekstrak rootfs ke HP..." -ForegroundColor Cyan
+    Write-Host "==> Mentransfer arsip rootfs ke HP..." -ForegroundColor Cyan
     adb push $rootfsArchive /data/local/tmp/rootfs.tar.gz
-    adb shell "mkdir -p /data/local/tmp/rootfs && tar -xzf /data/local/tmp/rootfs.tar.gz -C /data/local/tmp/rootfs"
 }
 
 Write-Host "==> Membuka aplikasi di HP..." -ForegroundColor Cyan

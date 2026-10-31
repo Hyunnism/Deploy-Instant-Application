@@ -1,6 +1,6 @@
-# Checksums untuk assets rootfs dan binary Fase 1 (Debian + Node + Git + Curl)
+# Checksums untuk assets rootfs dan binary Fase 2 (Node.js v24.22.1 LTS + PM2 + Cloudflared + Git + Curl)
 # Format: <SHA256>  <NAMA_FILE>
 
-a05613578c525d5f3007d89aa3f713fbdd32af979c15e6d4f8e447f53f91c5c9  rootfs.tar.gz
+d40d8dd7d130b5e66609d6e3c2cf771b881a063414038c33ca8bcf244d691674  rootfs.tar.gz
 47466f272c72bdfb6c68a4ee7f311dfc2825b03fbfa5ee0535e80cf91f13b63d  libproot.so
 1934cfa729bc811f1a56bc342ae4e12c5bbf5ebfe83995f5dc4333dc5e1e1948  libproot-loader.so
