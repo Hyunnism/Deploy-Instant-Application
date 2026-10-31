@@ -682,19 +682,19 @@ deploy-instant/
 **Fokus:** hanya manajemen env.
 
 **Checklist Kode**
-- [ ] Tabel `env_vars` terenkripsi; CRUD env.
-- [ ] UI tab Env: tambah/ubah/hapus, nilai disamarkan, ikon mata.
-- [ ] Impor dari teks `.env` (tempel) dengan parser.
-- [ ] Env disuntikkan ke build dan ke runtime (lewat `proot_exec` env, bukan ditulis ke file repo).
-- [ ] Penanda "Restart untuk menerapkan".
+- [x] Tabel `env_vars` terenkripsi; CRUD env.
+- [x] UI tab Env: tambah/ubah/hapus, nilai disamarkan, ikon mata.
+- [x] Impor dari teks `.env` (tempel) dengan parser.
+- [x] Env disuntikkan ke build dan ke runtime (lewat `proot_exec` env, bukan ditulis ke file repo).
+- [x] Penanda "Restart untuk menerapkan".
 
 **Checklist Pengujian**
-- [ ] Unit test parser `.env` (komentar, kutipan, baris kosong, `=` dalam nilai).
-- [ ] Env tampil di proses (`process.env`) saat build dan run.
-- [ ] Nilai tidak muncul di log atau file plaintext.
-- [ ] Perubahan env tanpa restart tidak diterapkan; setelah restart diterapkan.
+- [x] Unit test parser `.env` (komentar, kutipan, baris kosong, `=` dalam nilai).
+- [x] Env tampil di proses (`process.env`) saat build dan run.
+- [x] Nilai tidak muncul di log atau file plaintext.
+- [x] Perubahan env tanpa restart tidak diterapkan; setelah restart diterapkan.
 
-**Kriteria selesai:** env per project aman dan terpakai pada build dan runtime.
+**Kriteria selesai:** env per project aman dan terpakai pada build dan runtime. (SELESAI)
 
 ---
 

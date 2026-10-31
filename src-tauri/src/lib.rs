@@ -16,7 +16,7 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|e| Box::new(std::io::Error::other(format!("Gagal app data dir: {e}"))))?;
             let db_path = app_files_dir.join("db").join("deploy_instant.sqlite");
-            let db = storage::db::Database::open(&db_path).map_err(|e| {
+            let db = storage::db::Database::open(&db_path, &app_files_dir).map_err(|e| {
                 Box::new(std::io::Error::other(format!("Gagal init SQLite db: {e}")))
             })?;
             app.manage(db);
@@ -41,6 +41,10 @@ pub fn run() {
             commands::project::project_build_cancel,
             commands::project::project_build_logs_list,
             commands::project::project_build_log_read,
+            commands::project::project_env_list,
+            commands::project::project_env_set,
+            commands::project::project_env_delete,
+            commands::project::project_env_import_dotenv,
             commands::project::settings_save_pat,
             commands::project::settings_get_pat_status,
             commands::project::settings_delete_pat,

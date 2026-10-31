@@ -1,10 +1,11 @@
 // commands/project.rs
 // Thin IPC layer untuk operasi Project, Git, dan Settings (Fase 3 & 4)
 
+use crate::core::env::parse_dotenv;
 use crate::core::project as core_project;
 use crate::models::{
-    BuildResult, CreateProjectInput, PatStatus, Project, PullResult, RepoStatus, SettingItem,
-    UpdateProjectInput,
+    BuildResult, CreateProjectInput, EnvVarItem, PatStatus, Project, PullResult, RepoStatus,
+    SettingItem, UpdateProjectInput,
 };
 use crate::storage::db::Database;
 use crate::storage::secrets;
@@ -215,4 +216,36 @@ pub fn project_build_log_read(
         .app_data_dir()
         .map_err(|e| format!("Gagal app data dir: {e}"))?;
     core_project::read_build_log(&app_files_dir, &proj.name, &filename).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_env_list(db: State<'_, Database>, id: i64) -> Result<Vec<EnvVarItem>, String> {
+    db.get_env_vars(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_env_set(
+    db: State<'_, Database>,
+    id: i64,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    db.set_env_var(id, &key, &value).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_env_delete(db: State<'_, Database>, id: i64, key: String) -> Result<(), String> {
+    db.delete_env_var(id, &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn project_env_import_dotenv(
+    db: State<'_, Database>,
+    id: i64,
+    content: String,
+) -> Result<Vec<EnvVarItem>, String> {
+    let parsed = parse_dotenv(&content).map_err(|e| e.to_string())?;
+    db.set_env_vars_batch(id, &parsed)
+        .map_err(|e| e.to_string())?;
+    db.get_env_vars(id).map_err(|e| e.to_string())
 }

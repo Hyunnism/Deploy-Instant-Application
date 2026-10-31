@@ -1,8 +1,13 @@
 // storage/db.rs
-// SQLite database + migrasi + CRUD Project & Settings (Fase 3)
+// SQLite database + migrasi + CRUD Project & Settings (Fase 3 & Fase 6)
 
 use crate::error::AppError;
 use crate::models::{CreateProjectInput, EnvVarItem, Project, SettingItem, UpdateProjectInput};
+use crate::storage::secrets::{decrypt_secret, encrypt_secret, get_or_create_master_key};
+use aes_gcm::{
+    Aes256Gcm, Key,
+    aead::{KeyInit, OsRng},
+};
 use rusqlite::{Connection, OptionalExtension, params};
 use std::fs;
 use std::path::Path;
@@ -10,21 +15,25 @@ use std::sync::Mutex;
 
 pub struct Database {
     conn: Mutex<Connection>,
+    master_key: Key<Aes256Gcm>,
 }
 
 impl Database {
     /// Inisialisasi database SQLite pada path yang diberikan dan jalankan migrasi schema
-    pub fn open(db_path: &Path) -> Result<Self, AppError> {
+    pub fn open(db_path: &Path, key_dir: &Path) -> Result<Self, AppError> {
         if let Some(parent) = db_path.parent() {
             fs::create_dir_all(parent)
                 .map_err(|e| AppError::Internal(format!("Gagal membuat direktori db: {e}")))?;
         }
+
+        let master_key = get_or_create_master_key(key_dir)?;
 
         let conn = Connection::open(db_path)
             .map_err(|e| AppError::Internal(format!("Gagal membuka koneksi SQLite: {e}")))?;
 
         let db = Self {
             conn: Mutex::new(conn),
+            master_key,
         };
         db.init_schema()?;
         Ok(db)
@@ -35,11 +44,25 @@ impl Database {
         let conn = Connection::open_in_memory()
             .map_err(|e| AppError::Internal(format!("Gagal membuka SQLite in-memory: {e}")))?;
 
+        let master_key = Aes256Gcm::generate_key(OsRng);
+
         let db = Self {
             conn: Mutex::new(conn),
+            master_key,
         };
         db.init_schema()?;
         Ok(db)
+    }
+
+    /// Enkripsi nilai environment variable dengan AES-256-GCM
+    pub fn encrypt_env_value(&self, val: &str) -> Result<String, AppError> {
+        encrypt_secret(&self.master_key, val)
+    }
+
+    /// Dekripsi nilai environment variable terenkripsi.
+    /// Bila data lama belum terenkripsi, fallback ke nilai plaintext asli.
+    pub fn decrypt_env_value(&self, val: &str) -> String {
+        decrypt_secret(&self.master_key, val).unwrap_or_else(|_| val.to_string())
     }
 
     /// Eksekusi migrasi schema tabel PRD Section 8.4
@@ -313,9 +336,10 @@ impl Database {
 
         if let Some(envs) = &input.env_vars {
             for item in envs {
+                let enc_val = self.encrypt_env_value(&item.value)?;
                 tx.execute(
                     "INSERT INTO env_vars (project_id, key, value) VALUES (?1, ?2, ?3);",
-                    params![project_id, item.key.trim(), item.value],
+                    params![project_id, item.key.trim(), enc_val],
                 )
                 .map_err(|e| AppError::Internal(format!("Gagal menyimpan env var: {e}")))?;
             }
@@ -396,7 +420,13 @@ impl Database {
 
             let mut env_vars = Vec::new();
             for item in env_iter {
-                env_vars.push(item.map_err(|e| AppError::Internal(format!("Env row error: {e}")))?);
+                let raw_item =
+                    item.map_err(|e| AppError::Internal(format!("Env row error: {e}")))?;
+                let decrypted_val = self.decrypt_env_value(&raw_item.value);
+                env_vars.push(EnvVarItem {
+                    key: raw_item.key,
+                    value: decrypted_val,
+                });
             }
 
             projects.push(Project {
@@ -497,7 +527,12 @@ impl Database {
 
         let mut env_vars = Vec::new();
         for item in env_iter {
-            env_vars.push(item.map_err(|e| AppError::Internal(format!("Env row error: {e}")))?);
+            let raw_item = item.map_err(|e| AppError::Internal(format!("Env row error: {e}")))?;
+            let decrypted_val = self.decrypt_env_value(&raw_item.value);
+            env_vars.push(EnvVarItem {
+                key: raw_item.key,
+                value: decrypted_val,
+            });
         }
 
         Ok(Project {
@@ -642,9 +677,10 @@ impl Database {
                 .map_err(|e| AppError::Internal(format!("Gagal hapus env_vars lama: {e}")))?;
 
             for item in envs {
+                let enc_val = self.encrypt_env_value(&item.value)?;
                 tx.execute(
                     "INSERT INTO env_vars (project_id, key, value) VALUES (?1, ?2, ?3);",
-                    params![id, item.key.trim(), item.value],
+                    params![id, item.key.trim(), enc_val],
                 )
                 .map_err(|e| AppError::Internal(format!("Gagal simpan env_var baru: {e}")))?;
             }
@@ -696,6 +732,100 @@ impl Database {
                 "Project dengan ID {id} tidak ditemukan"
             )));
         }
+
+        Ok(())
+    }
+
+    /// Ambil daftar environment variables untuk suatu project (nilai terdekripsi)
+    pub fn get_env_vars(&self, project_id: i64) -> Result<Vec<EnvVarItem>, AppError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        let mut stmt = conn
+            .prepare("SELECT key, value FROM env_vars WHERE project_id = ?1 ORDER BY key ASC;")
+            .map_err(|e| AppError::Internal(format!("Prepare env_vars error: {e}")))?;
+
+        let rows = stmt
+            .query_map(params![project_id], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            })
+            .map_err(|e| AppError::Internal(format!("Query env_vars error: {e}")))?;
+
+        let mut result = Vec::new();
+        for item in rows {
+            let (key, raw_val) =
+                item.map_err(|e| AppError::Internal(format!("Env row error: {e}")))?;
+            let value = self.decrypt_env_value(&raw_val);
+            result.push(EnvVarItem { key, value });
+        }
+
+        Ok(result)
+    }
+
+    /// Set satu environment variable (otomatis terenkripsi AES-256-GCM)
+    pub fn set_env_var(&self, project_id: i64, key: &str, value: &str) -> Result<(), AppError> {
+        let clean_key = key.trim();
+        Self::validate_env_key(clean_key)?;
+        let enc_val = self.encrypt_env_value(value)?;
+
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        conn.execute(
+            "INSERT INTO env_vars (project_id, key, value) VALUES (?1, ?2, ?3)
+             ON CONFLICT(project_id, key) DO UPDATE SET value = excluded.value;",
+            params![project_id, clean_key, enc_val],
+        )
+        .map_err(|e| AppError::Internal(format!("Gagal upsert env var: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Hapus satu environment variable berdasarkan key
+    pub fn delete_env_var(&self, project_id: i64, key: &str) -> Result<(), AppError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        conn.execute(
+            "DELETE FROM env_vars WHERE project_id = ?1 AND key = ?2;",
+            params![project_id, key.trim()],
+        )
+        .map_err(|e| AppError::Internal(format!("Gagal hapus env var: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Set daftar environment variables sekaligus (batch upsert/replace)
+    pub fn set_env_vars_batch(&self, project_id: i64, vars: &[EnvVarItem]) -> Result<(), AppError> {
+        let mut conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        let tx = conn
+            .transaction()
+            .map_err(|e| AppError::Internal(format!("Gagal transaksi batch env: {e}")))?;
+
+        for item in vars {
+            let key = item.key.trim();
+            Self::validate_env_key(key)?;
+            let enc_val = self.encrypt_env_value(&item.value)?;
+            tx.execute(
+                "INSERT INTO env_vars (project_id, key, value) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(project_id, key) DO UPDATE SET value = excluded.value;",
+                params![project_id, key, enc_val],
+            )
+            .map_err(|e| AppError::Internal(format!("Gagal upsert batch env var: {e}")))?;
+        }
+
+        tx.commit()
+            .map_err(|e| AppError::Internal(format!("Gagal commit batch env: {e}")))?;
 
         Ok(())
     }
@@ -903,5 +1033,83 @@ mod tests {
 
         let get_deleted = db.get_project(created.id);
         assert!(get_deleted.is_err());
+    }
+
+    #[test]
+    fn test_env_vars_encryption_and_crud() {
+        let db = Database::open_in_memory().expect("open in-memory db");
+
+        let project = db
+            .create_project(CreateProjectInput {
+                name: "secure-app".into(),
+                repo_url: "https://github.com/secure/app.git".into(),
+                branch: Some("main".into()),
+                build_cmd: None,
+                start_cmd: None,
+                port_manual: Some(3000),
+                auto_start: Some(true),
+                env_vars: Some(vec![EnvVarItem {
+                    key: "DATABASE_PASSWORD".into(),
+                    value: "SuperSecretPass123!".into(),
+                }]),
+            })
+            .expect("create project");
+
+        // 1. Periksa penyimpanan raw di SQLite: nilainya terenkripsi dan BUKAN plaintext
+        {
+            let conn = db.conn.lock().unwrap();
+            let raw_stored: String = conn
+                .query_row(
+                    "SELECT value FROM env_vars WHERE project_id = ?1 AND key = 'DATABASE_PASSWORD';",
+                    params![project.id],
+                    |r| r.get(0),
+                )
+                .expect("query raw env");
+
+            // Format terenkripsi AES-256-GCM adalah <nonce_hex>:<ciphertext_hex>
+            assert!(raw_stored.contains(':'));
+            // Plaintext tidak boleh bocor sama sekali di database!
+            assert!(!raw_stored.contains("SuperSecretPass123!"));
+        }
+
+        // 2. get_env_vars mendekripsi nilai dengan sempurna
+        let envs = db.get_env_vars(project.id).expect("get_env_vars");
+        assert_eq!(envs.len(), 1);
+        assert_eq!(envs[0].key, "DATABASE_PASSWORD");
+        assert_eq!(envs[0].value, "SuperSecretPass123!");
+
+        // 3. set_env_var menambah/mengupdate variabel tunggal
+        db.set_env_var(project.id, "API_KEY", "key-999-xyz")
+            .expect("set_env_var");
+        let envs2 = db.get_env_vars(project.id).expect("get_env_vars after set");
+        assert_eq!(envs2.len(), 2);
+
+        // 4. delete_env_var menghapus variabel tertentu
+        db.delete_env_var(project.id, "API_KEY")
+            .expect("delete_env_var");
+        let envs3 = db
+            .get_env_vars(project.id)
+            .expect("get_env_vars after delete");
+        assert_eq!(envs3.len(), 1);
+        assert_eq!(envs3[0].key, "DATABASE_PASSWORD");
+
+        // 5. set_env_vars_batch
+        db.set_env_vars_batch(
+            project.id,
+            &[
+                EnvVarItem {
+                    key: "VAR_A".into(),
+                    value: "apple".into(),
+                },
+                EnvVarItem {
+                    key: "VAR_B".into(),
+                    value: "banana".into(),
+                },
+            ],
+        )
+        .expect("batch set envs");
+
+        let envs4 = db.get_env_vars(project.id).expect("get envs after batch");
+        assert_eq!(envs4.len(), 3);
     }
 }

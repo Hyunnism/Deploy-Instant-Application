@@ -3,6 +3,30 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [0.7.0] - 2026-10-31
+### Ditambahkan
+- **Fase 6 — Environment Variables**:
+  - Penyimpanan Rahasia Terenkripsi AES-256-GCM (`storage/db.rs`):
+    - Seluruh nilai variabel lingkungan dienkripsi menggunakan AES-256-GCM via master key 256-bit (`.master.key`) sebelum disimpan ke tabel `env_vars` di SQLite database.
+    - Format penyimpanan ciphertext terisolasi `<nonce_hex>:<ciphertext_hex>` tanpa celah kebocoran plaintext ke database.
+    - Dekripsi otomatis saat query project dengan fallback transparan untuk variabel lawas.
+    - Metode CRUD granular: `get_env_vars()`, `set_env_var()`, `delete_env_var()`, `set_env_vars_batch()`.
+  - Zero-Leakage In-Memory Injection (PRD Bagian 8.4 & 13 Fase 6):
+    - Tidak pernah membuat file `.env` di direktori proyek `/app/<project_name>` pada disk rootfs.
+    - Seluruh variabel lingkungan diinjeksikan secara eksklusif ke memory process environment vector saat pemanggilan `proot_exec`.
+  - Parser Format POSIX Dotenv Mandiri (`core/env.rs`):
+    - Parser native zero-dependency yang mematuhi standar POSIX dotenv: mendukung baris kosong, komentar `#`, prefiks `export `, tanda kutip ganda `"..."`, tanda kutip tunggal `'...'`, multiple `=` dalam nilai, dan karakter escape `\n`, `\t`, `\"`.
+    - Validasi nama key POSIX `^[a-zA-Z_][a-zA-Z0-9_]*$` untuk mencegah penamaan variabel invalid atau injeksi shell.
+  - Antarmuka & UX Pengaturan Variabel Lingkungan Bergaya Open Pi (`ui/src/main.ts`, `ui/src/styles/index.css`):
+    - Kartu Environment Variables pada Form Project Modal (Create & Edit) dengan notifikasi info perubahan membutuhkan Restart Service.
+    - Tombol aksi "+ Tambah Variabel" dan "📋 Impor dari .env" yang responsif dan diletakkan secara ergonomis di header kartu.
+    - Masking keamanan nilai variabel lingkungan secara default (`type="password"`) dilengkapi tombol toggle mata (👁 / 👁‍🗨) untuk melihat/menyembunyikan nilai rahasia per baris.
+    - Modal impor dotenv dengan textarea monospace dan validasi parser POSIX real-time: otomatis menggabungkan (merge) variabel baru dan menimpa variabel duplikat.
+    - Penyempurnaan scrolling mobile dengan `flex: 1 1 0; min-height: 0; touch-action: pan-y;` dan sticky footer di layar perangkat.
+  - Unit Test & Verifikasi Hardware:
+    - 4 test suite baru di `core/env.rs` dan `storage/db.rs` menguji parser dotenv penuh, validasi key, unquote, dan verifikasi bahwa query raw SQLite hanya menghasilkan hex ciphertext `<nonce>:<ciphertext>` tanpa plaintext.
+    - Pengujian langsung di perangkat fisik Android (`462a07fa0405`): impor dotenv sukses, toggle mata berfungsi, nilai tersimpan terenkripsi di SQLite HP, dan verifikasi `ls -la rootfs/app/spoon-knife/.env` menghasilkan `NOT_FOUND` (zero disk leakage).
+
 ## [0.6.0] - 2026-10-31
 ### Ditambahkan
 - **Fase 5 — Build Production**:

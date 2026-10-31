@@ -247,4 +247,22 @@ export async function onBuildLog(
   });
 }
 
+// Fase 6: Environment Variables
+export async function getProjectEnvVars(id: number): Promise<EnvVarItem[]> {
+  return await invoke<EnvVarItem[]>('project_env_list', { id });
+}
+
+export async function setProjectEnvVar(id: number, key: string, value: string): Promise<void> {
+  return await invoke<void>('project_env_set', { id, key, value });
+}
+
+export async function deleteProjectEnvVar(id: number, key: string): Promise<void> {
+  return await invoke<void>('project_env_delete', { id, key });
+}
+
+export async function importDotenv(id: number, content: string): Promise<EnvVarItem[]> {
+  return await invoke<EnvVarItem[]>('project_env_import_dotenv', { id, content });
+}
+
+
 

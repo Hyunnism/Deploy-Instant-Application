@@ -133,6 +133,18 @@ export const translations = {
     errorSummaryTitle: 'Ringkasan Error (50 Baris Terakhir)',
     rebuildBtn: 'Build Ulang',
     viewBuildLogBtn: 'Lihat Log',
+
+    // Fase 6 Environment Variables
+    envSectionTitle: 'Environment Variables',
+    envSectionSubtitle: 'Tersimpan aman terenkripsi AES-256-GCM',
+    envRestartNotice: 'Perubahan variabel lingkungan membutuhkan Restart Service untuk diterapkan.',
+    envAddBtn: '+ Tambah Variabel',
+    envImportBtn: '📋 Impor dari .env',
+    envImportModalTitle: 'Impor dari File .env',
+    envImportPlaceholder: '# Tempel teks .env di sini\nPORT=3000\nNODE_ENV=production\nDATABASE_URL=postgres://...',
+    envImportProcessBtn: 'Proses & Terapkan',
+    envValuePlaceholder: 'Nilai variabel...',
+    envNoVars: 'Belum ada environment variables.',
   },
   en: {
     appName: 'Deploy Instant',
@@ -263,6 +275,18 @@ export const translations = {
     errorSummaryTitle: 'Error Summary (Last 50 Lines)',
     rebuildBtn: 'Rebuild',
     viewBuildLogBtn: 'View Logs',
+
+    // Fase 6 Environment Variables
+    envSectionTitle: 'Environment Variables',
+    envSectionSubtitle: 'Securely encrypted with AES-256-GCM',
+    envRestartNotice: 'Changes to environment variables require a Service Restart to take effect.',
+    envAddBtn: '+ Add Variable',
+    envImportBtn: '📋 Import from .env',
+    envImportModalTitle: 'Import from .env File',
+    envImportPlaceholder: '# Paste .env text here\nPORT=3000\nNODE_ENV=production\nDATABASE_URL=postgres://...',
+    envImportProcessBtn: 'Parse & Apply',
+    envValuePlaceholder: 'Variable value...',
+    envNoVars: 'No environment variables set.',
   },
 } as const;
 

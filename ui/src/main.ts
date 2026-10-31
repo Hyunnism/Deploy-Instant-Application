@@ -32,7 +32,7 @@ import {
   type Project,
 } from './api';
 import { translations, type TranslationKey } from './i18n';
-import { defaultFormData, state } from './state';
+import { defaultFormData, state, type FormEnvVar } from './state';
 
 const appEl = document.getElementById('app')!;
 
@@ -232,6 +232,7 @@ function render() {
       ${renderEngineModal()}
       ${renderGitLogModal()}
       ${renderBuildModal()}
+      ${renderDotenvModal()}
     </div>
   `;
 
@@ -384,6 +385,12 @@ function renderProjectCard(p: Project): string {
       ? `<span class="meta-badge autostart">
                  <span class="meta-dot"></span>
                  ${t('autoStartBadge')}
+               </span>`
+      : ''
+    }
+        ${p.env_vars && p.env_vars.length > 0
+      ? `<span class="meta-badge" title="${p.env_vars.length} Environment Variables">
+                 🔒 ${p.env_vars.length} Env
                </span>`
       : ''
     }
@@ -658,27 +665,62 @@ function renderFormModal(): string {
             </div>
           </div>
 
-          <!-- Env Vars Card -->
+          <!-- Env Vars Card (Fase 6) -->
           <div class="form-group-card">
-            <div class="form-group-title">${t('fieldEnvVars')}</div>
-            <div id="env-vars-list">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 6px 14px;">
+              <div>
+                <div class="form-group-title" style="padding: 0;">${t('envSectionTitle')}</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 1px;">
+                  ${t('envSectionSubtitle')}
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-env-action" id="btn-import-dotenv" style="padding: 5px 10px; font-size: 0.76rem;">
+                  ${t('envImportBtn')}
+                </button>
+                <button type="button" class="btn-env-action" id="btn-add-env-row" style="padding: 5px 10px; font-size: 0.76rem;">
+                  ${t('envAddBtn')}
+                </button>
+              </div>
+            </div>
+
+            ${modal.mode === 'edit'
+      ? `<div style="padding: 4px 14px 8px 14px;">
+                   <div class="env-restart-notice">
+                     <span>ℹ</span>
+                     <span>${t('envRestartNotice')}</span>
+                   </div>
+                 </div>`
+      : ''
+    }
+
+            <div id="env-vars-list" style="padding: 0 4px 10px 4px;">
               ${d.env_vars.length === 0
-      ? `<div style="padding: 10px 14px; font-size: 0.8rem; color: var(--text-subtle);">Tidak ada variabel custom.</div>`
+      ? `<div style="padding: 8px 10px; font-size: 0.8rem; color: var(--text-subtle);">${t('envNoVars')}</div>`
       : d.env_vars
         .map(
-          (env, idx) => `
-                    <div class="env-row-item">
-                      <input type="text" class="form-input mono env-key-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envKeyPlaceholder')}" value="${env.key}" />
-                      <input type="text" class="form-input mono env-val-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envValPlaceholder')}" value="${env.value}" />
-                      <button class="env-remove-btn" data-index="${idx}" title="Hapus">✕</button>
+          (env, idx) => {
+            const isRevealed = !!modal.revealedEnvs[idx];
+            return `
+                    <div class="env-item-row" style="padding: 4px 10px;">
+                      <input type="text" class="form-input mono env-key-input" data-index="${idx}"
+                        autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                        placeholder="${t('envKeyPlaceholder')}" value="${env.key}" />
+                      <div class="env-val-wrapper">
+                        <input type="${isRevealed ? 'text' : 'password'}" class="form-input mono env-val-input" data-index="${idx}"
+                          autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off"
+                          placeholder="${t('envValuePlaceholder')}" value="${env.value}" />
+                        <button type="button" class="btn-toggle-eye" data-index="${idx}" title="${isRevealed ? 'Sembunyikan' : 'Tampilkan'}">
+                          ${isRevealed ? '👁' : '👁‍🗨'}
+                        </button>
+                      </div>
+                      <button type="button" class="env-remove-btn" data-index="${idx}" title="Hapus">✕</button>
                     </div>
-                  `
+                  `;
+          }
         )
         .join('')
     }
-            </div>
-            <div class="add-env-btn-row">
-              <button class="subtle-btn" id="btn-add-env-row">${t('addEnvBtn')}</button>
             </div>
           </div>
         </div>
@@ -689,6 +731,41 @@ function renderFormModal(): string {
           <button class="modal-btn primary" id="btn-save-project" ${modal.isSaving ? 'disabled' : ''}>
             ${modal.isSaving ? t('modalSaving') : t('modalSave')}
           </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FASE 6: DOTENV IMPORT MODAL
+// -------------------------------------------------------------
+function renderDotenvModal(): string {
+  const modal = state.dotenvModal;
+  if (!modal.isOpen) return '';
+
+  return `
+    <div class="modal-overlay" id="dotenv-modal-overlay">
+      <div class="modal-sheet" style="height: 80%; max-height: 80%;">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title">${t('envImportModalTitle')}</h3>
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">Format POSIX (#, export, quotes)</div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-dotenv-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body" style="padding-top: 10px;">
+          ${modal.error ? `<div class="modal-alert error" style="margin-bottom: 12px;">${modal.error}</div>` : ''}
+          <textarea id="textarea-dotenv-content" class="dotenv-textarea"
+            placeholder="${t('envImportPlaceholder')}"
+            autocapitalize="none" autocorrect="off" spellcheck="false">${modal.text}</textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn cancel" id="btn-cancel-dotenv-modal">${t('modalCancel')}</button>
+          <button class="modal-btn primary" id="btn-process-dotenv">${t('envImportProcessBtn')}</button>
         </div>
       </div>
     </div>
@@ -1515,6 +1592,7 @@ function attachEventListeners() {
       data: { ...defaultFormData, env_vars: [] },
       isSaving: false,
       error: null,
+      revealedEnvs: {},
     };
     render();
   };
@@ -1556,6 +1634,7 @@ function attachEventListeners() {
         },
         isSaving: false,
         error: null,
+        revealedEnvs: {},
       };
       render();
     });
@@ -1634,6 +1713,94 @@ function attachEventListeners() {
   // Add Env Row
   document.getElementById('btn-add-env-row')?.addEventListener('click', () => {
     state.formModal.data.env_vars.push({ key: '', value: '' });
+    render();
+  });
+
+  // Toggle Eye for Env Values (Fase 6)
+  document.querySelectorAll('.btn-toggle-eye').forEach((el) => {
+    el.addEventListener('click', () => {
+      const idx = Number(el.getAttribute('data-index'));
+      state.formModal.revealedEnvs[idx] = !state.formModal.revealedEnvs[idx];
+      render();
+    });
+  });
+
+  // Open Dotenv Import Modal (Fase 6)
+  document.getElementById('btn-import-dotenv')?.addEventListener('click', () => {
+    state.dotenvModal = {
+      isOpen: true,
+      text: '',
+      error: null,
+    };
+    render();
+  });
+
+  // Close Dotenv Modal
+  const closeDotenv = () => {
+    state.dotenvModal.isOpen = false;
+    render();
+  };
+  document.getElementById('btn-close-dotenv-modal')?.addEventListener('click', closeDotenv);
+  document.getElementById('btn-cancel-dotenv-modal')?.addEventListener('click', closeDotenv);
+  document.getElementById('dotenv-modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeDotenv();
+  });
+
+  // Process & Import Dotenv (Fase 6)
+  document.getElementById('btn-process-dotenv')?.addEventListener('click', () => {
+    const textarea = document.getElementById('textarea-dotenv-content') as HTMLTextAreaElement | null;
+    const text = textarea?.value ?? '';
+    if (!text.trim()) {
+      state.dotenvModal.error = 'Konten .env tidak boleh kosong';
+      render();
+      return;
+    }
+
+    const lines = text.split('\n');
+    const parsed: FormEnvVar[] = [];
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const cleanLine = trimmed.startsWith('export ') ? trimmed.slice(7).trim() : trimmed;
+      const eqIdx = cleanLine.indexOf('=');
+      if (eqIdx <= 0) continue;
+      const key = cleanLine.slice(0, eqIdx).trim();
+      let val = cleanLine.slice(eqIdx + 1).trim();
+      // unquote
+      if (
+        (val.startsWith('"') && val.endsWith('"') && val.length >= 2) ||
+        (val.startsWith("'") && val.endsWith("'") && val.length >= 2)
+      ) {
+        val = val.slice(1, -1);
+      } else {
+        const commentIdx = val.indexOf(' #');
+        if (commentIdx !== -1) val = val.slice(0, commentIdx).trim();
+      }
+      if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+        parsed.push({ key, value: val });
+      }
+    }
+
+    if (parsed.length === 0) {
+      state.dotenvModal.error = 'Tidak ada variabel valid yang ditemukan (format harus KEY=VALUE)';
+      render();
+      return;
+    }
+
+    // Gabungkan variabel: ganti yang duplikat, tambahkan yang baru
+    const existingMap = new Map<string, string>();
+    for (const ev of state.formModal.data.env_vars) {
+      if (ev.key.trim()) existingMap.set(ev.key.trim(), ev.value);
+    }
+    for (const ev of parsed) {
+      existingMap.set(ev.key, ev.value);
+    }
+
+    state.formModal.data.env_vars = Array.from(existingMap.entries()).map(([key, value]) => ({
+      key,
+      value,
+    }));
+    state.dotenvModal.isOpen = false;
     render();
   });
 

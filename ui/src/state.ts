@@ -41,6 +41,14 @@ export interface AppState {
     data: ProjectFormData;
     isSaving: boolean;
     error: string | null;
+    revealedEnvs: Record<number, boolean>;
+  };
+
+  // Fase 6 Dotenv Import Modal State
+  dotenvModal: {
+    isOpen: boolean;
+    text: string;
+    error: string | null;
   };
 
   // Delete Confirm Modal State
@@ -143,6 +151,13 @@ export const state: AppState = {
     projectId: null,
     data: { ...defaultFormData },
     isSaving: false,
+    error: null,
+    revealedEnvs: {},
+  },
+
+  dotenvModal: {
+    isOpen: false,
+    text: '',
     error: null,
   },
 
