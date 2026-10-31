@@ -37,7 +37,7 @@ function cleanVer(v: string | undefined | null, fallback: string): string {
 // RENDER CONTROLLER
 // -------------------------------------------------------------
 function render() {
-  const isReady = state.setupInfo?.is_ready ?? true;
+  const isReady = state.setupInfo?.is_ready ?? false;
 
   appEl.innerHTML = `
     <div class="app-container">
@@ -94,7 +94,7 @@ function renderDashboardView(isReady: boolean): string {
           <span class="engine-status-dot"></span>
           <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
           <span class="engine-status-sep"></span>
-          <span class="engine-status-detail">${t('viewDetailPill')}</span>
+          <span class="engine-status-detail">${isReady ? t('viewDetailPill') : t('installActionPill')}</span>
         </div>
       </div>
       <div class="overview-metrics">

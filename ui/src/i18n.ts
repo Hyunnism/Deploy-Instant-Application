@@ -72,6 +72,7 @@ export const translations = {
     engineNotInstalled: 'Lingkungan server belum terpasang di perangkat ini.',
     engineInstalledDesc: 'Seluruh dependensi utama siap menjalankan aplikasi Node.js mandiri.',
     viewDetailPill: 'Detail ›',
+    installActionPill: 'Pasang ›',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Hapus Project?',
@@ -163,6 +164,7 @@ export const translations = {
     engineNotInstalled: 'Server environment is not installed on this device.',
     engineInstalledDesc: 'All primary dependencies are ready to execute Node.js applications autonomously.',
     viewDetailPill: 'Details ›',
+    installActionPill: 'Install ›',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Delete Project?',
