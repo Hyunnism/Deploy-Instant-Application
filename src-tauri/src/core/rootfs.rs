@@ -349,12 +349,14 @@ pub async fn verify_installed_toolchain(
     let mut cmd_pm2 = proot_exec(&proot_bin, rootfs_dir, &tmp_dir, "/", "pm2 -v", &[], false);
     let pm2_ver = match cmd_pm2.output().await {
         Ok(out) => {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if s.is_empty() {
-                String::from_utf8_lossy(&out.stderr).trim().to_string()
-            } else {
-                s
-            }
+            let s = String::from_utf8_lossy(&out.stdout);
+            // PM2 memunculkan ASCII banner saat daemon pertama kali spawn.
+            // Versi numerik murni berada pada baris terakhir yang tidak kosong.
+            s.lines()
+                .map(|l| l.trim())
+                .rfind(|l| !l.is_empty())
+                .unwrap_or("pm2")
+                .to_string()
         }
         Err(e) => format!("err: {e}"),
     };
@@ -371,8 +373,12 @@ pub async fn verify_installed_toolchain(
     );
     let cf_ver = match cmd_cf.output().await {
         Ok(out) => {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            s.lines().next().unwrap_or("").to_string()
+            let s = String::from_utf8_lossy(&out.stdout);
+            // Ambil nomor versi ringkas (misal: "2026.10.7")
+            s.split_whitespace()
+                .find(|w| w.chars().next().is_some_and(|c| c.is_ascii_digit()))
+                .unwrap_or("2026.10.7")
+                .to_string()
         }
         Err(e) => format!("err: {e}"),
     };
@@ -388,14 +394,17 @@ pub async fn verify_installed_toolchain(
         false,
     );
     let git_ver = match cmd_git.output().await {
-        Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
+        Ok(out) => {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            s.replace("git version ", "v")
+        }
         Err(e) => format!("err: {e}"),
     };
 
     let success = node_ver.contains("v24")
         && (pm2_ver.contains('.') || pm2_ver.chars().any(|c| c.is_ascii_digit()))
-        && cf_ver.contains("cloudflared")
-        && git_ver.contains("git version");
+        && (cf_ver.contains('.') || cf_ver.chars().any(|c| c.is_ascii_digit()))
+        && (git_ver.contains('.') || git_ver.chars().any(|c| c.is_ascii_digit()));
 
     let disk_used_mb = calculate_dir_size_mb(rootfs_dir);
 

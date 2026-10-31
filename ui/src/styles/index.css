@@ -373,6 +373,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .tool-name {
@@ -381,6 +383,9 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tool-version {
@@ -388,6 +393,9 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--accent-emerald);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .badge-tag {

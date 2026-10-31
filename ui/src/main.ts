@@ -11,6 +11,13 @@ import { state } from './state';
 
 const appEl = document.getElementById('app')!;
 
+function cleanVer(v: string | undefined | null, fallback: string): string {
+  if (!v) return fallback;
+  const lines = v.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  const last = lines[lines.length - 1] || fallback;
+  return last.length > 20 ? last.slice(0, 18) + '...' : last;
+}
+
 function render() {
   const isPinging = state.status === 'pinging';
   const isConnected = state.status === 'connected';
@@ -147,21 +154,22 @@ function render() {
         <div class="toolchain-grid">
           <div class="toolchain-card">
             <span class="tool-name">Node.js</span>
-            <span class="tool-version">${
-              vRes ? vRes.node_version : state.setupInfo?.version || 'v24.22.1'
-            }</span>
+            <span class="tool-version">${cleanVer(
+              vRes?.node_version || state.setupInfo?.version,
+              'v24.22.1'
+            )}</span>
           </div>
           <div class="toolchain-card">
             <span class="tool-name">PM2</span>
-            <span class="tool-version">${vRes ? vRes.pm2_version : '5.4.3'}</span>
+            <span class="tool-version">${cleanVer(vRes?.pm2_version, 'v7.1.1')}</span>
           </div>
           <div class="toolchain-card">
             <span class="tool-name">Cloudflared</span>
-            <span class="tool-version">${vRes ? vRes.cloudflared_version : 'Terpasang'}</span>
+            <span class="tool-version">${cleanVer(vRes?.cloudflared_version, '2026.10.7')}</span>
           </div>
           <div class="toolchain-card">
             <span class="tool-name">Git & Curl</span>
-            <span class="tool-version">${vRes ? vRes.git_version : '2.39.5'}</span>
+            <span class="tool-version">${cleanVer(vRes?.git_version, 'v2.39.5')}</span>
           </div>
         </div>
 
