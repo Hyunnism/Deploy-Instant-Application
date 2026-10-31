@@ -9,7 +9,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 pub const EXPECTED_ROOTFS_SHA256: &str =
-    "d40d8dd7d130b5e66609d6e3c2cf771b881a063414038c33ca8bcf244d691674";
+    "9325e538ad38270cdde26fc4d268e0af71b352aa7ca97cc9c399d444b7b239bb";
 pub const MIN_FREE_DISK_MB: u64 = 600;
 
 #[cfg(target_os = "android")]
