@@ -54,13 +54,60 @@ function escapeHtml(str: string): string {
 function addEngineLog(msg: string) {
   const d = new Date();
   const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-  state.engineLogs.push(`[${time}] ${msg}`);
+  const fullLine = `[${time}] ${msg}`;
+  state.engineLogs.push(fullLine);
+
+  const container = document.getElementById('engine-logs-content');
+  if (container) {
+    const placeholder = container.querySelector('.log-line.muted');
+    if (placeholder) placeholder.remove();
+
+    let cls = 'step';
+    if (fullLine.includes('[OK]') || fullLine.includes('selesai') || fullLine.includes('ready') || fullLine.includes('berhasil') || fullLine.includes('sehat')) cls = 'success';
+    else if (fullLine.includes('WARN') || fullLine.includes('peringatan')) cls = 'warn';
+    else if (fullLine.includes('ERR') || fullLine.includes('gagal') || fullLine.includes('error')) cls = 'error';
+
+    const div = document.createElement('div');
+    div.className = `log-line ${cls}`;
+    div.textContent = fullLine;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
 }
 
-function addGitLog(msg: string) {
-  const d = new Date();
-  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-  state.gitLogModal.logs.push(`[${time}] ${msg}`);
+function appendGitTerminalLog(line: string) {
+  state.gitLogModal.logs.push(line);
+
+  const container = document.getElementById('git-logs-content');
+  if (container) {
+    const placeholder = container.querySelector('.log-line.muted');
+    if (placeholder) placeholder.remove();
+
+    let cls = 'step';
+    if (line.includes('==> Memulai') || line.includes('Cloning') || line.includes('Receiving objects')) cls = 'step';
+    else if (line.includes('sukses') || line.includes('terbaru') || line.includes('Pembaruan berhasil') || line.includes('Resolving deltas: 100%')) cls = 'success';
+    else if (line.includes('error') || line.includes('fatal') || line.includes('gagal') || line.includes('CLEANUP') || line.includes('[ERROR]')) cls = 'error';
+
+    const div = document.createElement('div');
+    div.className = `log-line ${cls}`;
+    div.textContent = line;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function updateGitModalStatus(subtitleText: string, isRunning: boolean) {
+  state.gitLogModal.isRunning = isRunning;
+  state.gitLogModal.statusMessage = subtitleText;
+
+  const subEl = document.getElementById('git-modal-subtitle');
+  if (subEl) {
+    subEl.textContent = subtitleText;
+  }
+  const btnEl = document.getElementById('btn-footer-close-git-modal');
+  if (btnEl) {
+    btnEl.textContent = isRunning ? 'Tutup Tampilan (Berjalan di Background)' : t('modalClose');
+  }
 }
 
 // -------------------------------------------------------------
@@ -88,13 +135,12 @@ function render() {
       </nav>
 
       <!-- Active View -->
-      ${
-        state.activeTab === 'settings'
-          ? renderSettingsView()
-          : state.activeTab === 'diagnostics'
-          ? renderDiagnosticsView()
-          : renderDashboardView(isReady)
-      }
+      ${state.activeTab === 'settings'
+      ? renderSettingsView()
+      : state.activeTab === 'diagnostics'
+        ? renderDiagnosticsView()
+        : renderDashboardView(isReady)
+    }
 
       <!-- Modals -->
       ${renderFormModal()}
@@ -155,11 +201,10 @@ function renderDashboardView(isReady: boolean): string {
     </section>
 
     <div class="projects-container">
-      ${
-        projectCount === 0
-          ? renderEmptyState()
-          : state.projects.map((p) => renderProjectCard(p)).join('')
-      }
+      ${projectCount === 0
+      ? renderEmptyState()
+      : state.projects.map((p) => renderProjectCard(p)).join('')
+    }
     </div>
   `;
 }
@@ -191,26 +236,24 @@ function renderProjectCard(p: Project): string {
           <div class="project-name">${p.name}</div>
         </div>
         <div class="project-card-actions">
-          ${
-            !isCloned
-              ? `<button class="proj-action-btn clone btn-clone-project" data-id="${p.id}" ${repo?.isCloning ? 'disabled' : ''}>
+          ${!isCloned
+      ? `<button class="proj-action-btn clone btn-clone-project" data-id="${p.id}" ${repo?.isCloning ? 'disabled' : ''}>
                    ${repo?.isCloning ? t('cloningRepo') : t('cloneRepoBtn')}
                  </button>`
-              : `<button class="proj-action-btn pull btn-pull-project" data-id="${p.id}" ${repo?.isPulling ? 'disabled' : ''}>
+      : `<button class="proj-action-btn pull btn-pull-project" data-id="${p.id}" ${repo?.isPulling ? 'disabled' : ''}>
                    ${repo?.isPulling ? t('pullingRepo') : t('pullBtn')}
                  </button>`
-          }
+    }
           <button class="proj-action-btn edit btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
           <button class="proj-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
         </div>
       </div>
 
       <div class="project-meta-row">
-        ${
-          isCloned && repo?.commit_hash
-            ? `<span class="meta-badge commit-hash">#${repo.commit_hash}</span>`
-            : `<span class="meta-badge not-cloned" style="color: #94a3b8; font-style: italic;">${t('notClonedBadge')}</span>`
-        }
+        ${isCloned && repo?.commit_hash
+      ? `<span class="meta-badge commit-hash">#${repo.commit_hash}</span>`
+      : `<span class="meta-badge not-cloned" style="color: #94a3b8; font-style: italic;">${t('notClonedBadge')}</span>`
+    }
         <span class="meta-badge">
           <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="6" y1="3" x2="6" y2="15"></line>
@@ -229,19 +272,17 @@ function renderProjectCard(p: Project): string {
           </svg>
           ${portLabel}
         </span>
-        ${
-          p.auto_start
-            ? `<span class="meta-badge autostart">
+        ${p.auto_start
+      ? `<span class="meta-badge autostart">
                  <span class="meta-dot"></span>
                  ${t('autoStartBadge')}
                </span>`
-            : ''
-        }
-        ${
-          isCloned && repo?.commit_message
-            ? `<span class="meta-badge commit-msg" title="${escapeHtml(repo.commit_message)}">${escapeHtml(repo.commit_message)}</span>`
-            : ''
-        }
+      : ''
+    }
+        ${isCloned && repo?.commit_message
+      ? `<span class="meta-badge commit-msg" title="${escapeHtml(repo.commit_message)}">${escapeHtml(repo.commit_message)}</span>`
+      : ''
+    }
       </div>
 
       <div class="project-repo-line">
@@ -317,13 +358,12 @@ function renderSettingsView(): string {
           <button class="modal-btn primary" id="btn-save-pat" style="flex: 1;" ${pat.isSaving ? 'disabled' : ''}>
             ${pat.isSaving ? 'Menyimpan...' : t('gitPatSaveBtn')}
           </button>
-          ${
-            pat.hasPat
-              ? `<button class="modal-btn danger" id="btn-delete-pat">
+          ${pat.hasPat
+      ? `<button class="modal-btn danger" id="btn-delete-pat">
                    ${t('gitPatDeleteBtn')}
                  </button>`
-              : ''
-          }
+      : ''
+    }
         </div>
 
         <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin-top: 2px;">
@@ -403,9 +443,8 @@ function renderDiagnosticsView(): string {
         </div>
       </div>
 
-      ${
-        pRes
-          ? `
+      ${pRes
+      ? `
       <div class="settings-card">
         <div class="overview-title-group">
           <h2>Hasil Probe PRoot</h2>
@@ -418,12 +457,11 @@ Network: ${pRes.network_check}
 Kernel: ${pRes.uname}</div>
       </div>
       `
-          : ''
-      }
+      : ''
+    }
 
-      ${
-        vRes
-          ? `
+      ${vRes
+      ? `
       <div class="settings-card">
         <div class="overview-title-group">
           <h2>Hasil Verifikasi Toolchain</h2>
@@ -435,8 +473,8 @@ Git: ${cleanVer(vRes.git_version, 'N/A')}
 Disk: ${vRes.disk_used_mb} MB terpasang</div>
       </div>
       `
-          : ''
-      }
+      : ''
+    }
     </div>
   `;
 }
@@ -516,21 +554,20 @@ function renderFormModal(): string {
           <div class="form-group-card">
             <div class="form-group-title">${t('fieldEnvVars')}</div>
             <div id="env-vars-list">
-              ${
-                d.env_vars.length === 0
-                  ? `<div style="padding: 10px 14px; font-size: 0.8rem; color: var(--text-subtle);">Tidak ada variabel custom.</div>`
-                  : d.env_vars
-                      .map(
-                        (env, idx) => `
+              ${d.env_vars.length === 0
+      ? `<div style="padding: 10px 14px; font-size: 0.8rem; color: var(--text-subtle);">Tidak ada variabel custom.</div>`
+      : d.env_vars
+        .map(
+          (env, idx) => `
                     <div class="env-row-item">
                       <input type="text" class="form-input mono env-key-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envKeyPlaceholder')}" value="${env.key}" />
                       <input type="text" class="form-input mono env-val-input" data-index="${idx}" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="${t('envValPlaceholder')}" value="${env.value}" />
                       <button class="env-remove-btn" data-index="${idx}" title="Hapus">✕</button>
                     </div>
                   `
-                      )
-                      .join('')
-              }
+        )
+        .join('')
+    }
             </div>
             <div class="add-env-btn-row">
               <button class="subtle-btn" id="btn-add-env-row">${t('addEnvBtn')}</button>
@@ -652,21 +689,15 @@ function renderEngineModal(): string {
           </div>
 
           <!-- If extracting / installing -->
-          ${
-            isExtracting && progress
-              ? `
-          <div class="setup-progress-wrap">
+          <div class="setup-progress-wrap" id="setup-progress-wrap" style="${isExtracting ? '' : 'display: none;'}">
             <div style="display: flex; justify-content: space-between; font-size: 0.82rem; font-weight: 600;">
-              <span>${progress.message}</span>
-              <span>${progress.percent}%</span>
+              <span id="setup-progress-msg">${progress?.message || ''}</span>
+              <span id="setup-progress-pct">${progress?.percent || 0}%</span>
             </div>
             <div class="setup-progress-bar-bg">
-              <div class="setup-progress-bar-fill" style="width: ${progress.percent}%;"></div>
+              <div class="setup-progress-bar-fill" style="width: ${progress?.percent || 0}%;"></div>
             </div>
           </div>
-          `
-              : ''
-          }
 
           <!-- Terminal Logs (Ref 2 Recent Logs Style) -->
           <div class="engine-logs-section">
@@ -675,17 +706,16 @@ function renderEngineModal(): string {
               <button class="engine-logs-copy" id="btn-copy-engine-logs">${t('copyLogsBtn')}</button>
             </div>
             <div class="engine-logs-box" id="engine-logs-content">
-              ${
-                state.engineLogs.length > 0
-                  ? state.engineLogs.map((line) => {
-                      let cls = 'step';
-                      if (line.includes('[OK]') || line.includes('selesai') || line.includes('ready') || line.includes('berhasil') || line.includes('sehat')) cls = 'success';
-                      else if (line.includes('WARN') || line.includes('peringatan')) cls = 'warn';
-                      else if (line.includes('ERR') || line.includes('gagal') || line.includes('error')) cls = 'error';
-                      return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
-                    }).join('')
-                  : `<div class="log-line muted">${t('noRecentLogs')}</div>`
-              }
+              ${state.engineLogs.length > 0
+      ? state.engineLogs.map((line) => {
+        let cls = 'step';
+        if (line.includes('[OK]') || line.includes('selesai') || line.includes('ready') || line.includes('berhasil') || line.includes('sehat')) cls = 'success';
+        else if (line.includes('WARN') || line.includes('peringatan')) cls = 'warn';
+        else if (line.includes('ERR') || line.includes('gagal') || line.includes('error')) cls = 'error';
+        return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+      }).join('')
+      : `<div class="log-line muted">${t('noRecentLogs')}</div>`
+    }
             </div>
           </div>
 
@@ -698,19 +728,18 @@ function renderEngineModal(): string {
         <!-- Sticky Footer -->
         <div class="modal-footer">
           <button class="modal-btn cancel" id="btn-cancel-engine-modal">${t('modalClose')}</button>
-          ${
-            !isReady
-              ? `
+          ${!isReady
+      ? `
             <button class="modal-btn primary" id="btn-start-engine-setup" ${isExtracting || isVerifying ? 'disabled' : ''}>
               ${isExtracting ? t('statusInstalling') : t('installEngineBtn')}
             </button>
           `
-              : `
+      : `
             <button class="modal-btn primary" id="btn-reverify-engine" ${isVerifying ? 'disabled' : ''}>
               ${isVerifying ? 'Memverifikasi...' : t('reverifyBtn')}
             </button>
           `
-          }
+    }
         </div>
       </div>
     </div>
@@ -731,7 +760,7 @@ function renderGitLogModal(): string {
         <div class="modal-header">
           <div>
             <h3 class="modal-title">${t('gitLogsModalTitle')} — ${modal.projectName}</h3>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+            <div id="git-modal-subtitle" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
               ${modal.isRunning ? 'Sedang mengeksekusi di rootfs container...' : (modal.statusMessage || 'Proses selesai.')}
             </div>
           </div>
@@ -745,17 +774,16 @@ function renderGitLogModal(): string {
               <button class="engine-logs-copy" id="btn-copy-git-logs">${t('copyLogsBtn')}</button>
             </div>
             <div class="engine-logs-box" id="git-logs-content" style="min-height: 220px; max-height: 350px;">
-              ${
-                modal.logs.length > 0
-                  ? modal.logs.map((line) => {
-                      let cls = 'step';
-                      if (line.includes('==> Memulai') || line.includes('Cloning') || line.includes('Receiving objects')) cls = 'step';
-                      else if (line.includes('sukses') || line.includes('terbaru') || line.includes('Pembaruan berhasil') || line.includes('Resolving deltas: 100%')) cls = 'success';
-                      else if (line.includes('error') || line.includes('fatal') || line.includes('gagal') || line.includes('CLEANUP')) cls = 'error';
-                      return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
-                    }).join('')
-                  : `<div class="log-line muted">Menunggu output dari Git...</div>`
-              }
+              ${modal.logs.length > 0
+      ? modal.logs.map((line) => {
+        let cls = 'step';
+        if (line.includes('==> Memulai') || line.includes('Cloning') || line.includes('Receiving objects')) cls = 'step';
+        else if (line.includes('sukses') || line.includes('terbaru') || line.includes('Pembaruan berhasil') || line.includes('Resolving deltas: 100%')) cls = 'success';
+        else if (line.includes('error') || line.includes('fatal') || line.includes('gagal') || line.includes('CLEANUP')) cls = 'error';
+        return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+      }).join('')
+      : `<div class="log-line muted">Menunggu output dari Git...</div>`
+    }
             </div>
           </div>
         </div>
@@ -837,8 +865,7 @@ function attachEventListeners() {
   });
 
   document.getElementById('btn-save-pat')?.addEventListener('click', async () => {
-    const inputPatEl = document.getElementById('input-github-pat') as HTMLInputElement | null;
-    const patVal = (inputPatEl ? inputPatEl.value : state.patSettings.inputPat).trim();
+    const patVal = state.patSettings.inputPat.trim();
     if (!patVal) {
       state.patSettings.error = 'Masukkan token PAT GitHub';
       render();
@@ -946,9 +973,15 @@ function attachEventListeners() {
       const unlisten = await onSetupProgress((p) => {
         state.setupProgress = p;
         addEngineLog(`[${p.step}] ${p.message} (${p.percent}%)`);
-        render();
-        const logBox = document.getElementById('engine-logs-content');
-        if (logBox) logBox.scrollTop = logBox.scrollHeight;
+
+        const wrap = document.getElementById('setup-progress-wrap');
+        if (wrap) wrap.style.display = 'block';
+        const msg = document.getElementById('setup-progress-msg');
+        if (msg) msg.textContent = p.message;
+        const pct = document.getElementById('setup-progress-pct');
+        if (pct) pct.textContent = `${p.percent}%`;
+        const fill = document.querySelector('.setup-progress-bar-fill') as HTMLElement | null;
+        if (fill) fill.style.width = `${p.percent}%`;
       });
 
       const res = await startSetup();
@@ -1055,16 +1088,12 @@ function attachEventListeners() {
           ...repoStatus,
           isCloning: false,
         };
-        state.gitLogModal.isRunning = false;
-        state.gitLogModal.statusMessage = 'Repository berhasil di-clone!';
+        updateGitModalStatus('Repository berhasil di-clone!', false);
       } catch (err: any) {
         state.repoStatuses[id].isCloning = false;
-        state.gitLogModal.isRunning = false;
-        state.gitLogModal.statusMessage = `Clone gagal: ${String(err)}`;
-        addGitLog(`[ERROR] ${String(err)}`);
+        updateGitModalStatus(`Clone gagal: ${String(err)}`, false);
+        appendGitTerminalLog(`[ERROR] ${String(err)}`);
       }
-      render();
-      scrollGitLogs();
     });
   });
 
@@ -1097,16 +1126,12 @@ function attachEventListeners() {
           ...repoStatus,
           isPulling: false,
         };
-        state.gitLogModal.isRunning = false;
-        state.gitLogModal.statusMessage = pullRes.summary;
+        updateGitModalStatus(pullRes.summary, false);
       } catch (err: any) {
         state.repoStatuses[id].isPulling = false;
-        state.gitLogModal.isRunning = false;
-        state.gitLogModal.statusMessage = `Pull gagal: ${String(err)}`;
-        addGitLog(`[ERROR] ${String(err)}`);
+        updateGitModalStatus(`Pull gagal: ${String(err)}`, false);
+        appendGitTerminalLog(`[ERROR] ${String(err)}`);
       }
-      render();
-      scrollGitLogs();
     });
   });
 
@@ -1252,22 +1277,9 @@ function attachEventListeners() {
 
   // Save Project
   document.getElementById('btn-save-project')?.addEventListener('click', async () => {
-    const inputName = document.getElementById('input-project-name') as HTMLInputElement | null;
-    const inputRepo = document.getElementById('input-repo-url') as HTMLInputElement | null;
-    const inputBranch = document.getElementById('input-branch') as HTMLInputElement | null;
-    const inputPort = document.getElementById('input-port') as HTMLInputElement | null;
-    const inputBuild = document.getElementById('input-build-cmd') as HTMLInputElement | null;
-    const inputStart = document.getElementById('input-start-cmd') as HTMLInputElement | null;
-    const inputAutoStart = document.getElementById('input-auto-start') as HTMLInputElement | null;
-
     const d = state.formModal.data;
-    const name = (inputName ? inputName.value : d.name).trim();
-    const repo_url = (inputRepo ? inputRepo.value : d.repo_url).trim();
-    const branch = (inputBranch ? inputBranch.value : d.branch).trim() || 'main';
-    const portRaw = (inputPort ? inputPort.value : d.port_manual).trim();
-    const build_cmd = (inputBuild ? inputBuild.value : d.build_cmd).trim() || 'npm install';
-    const start_cmd = (inputStart ? inputStart.value : d.start_cmd).trim() || 'npm start';
-    const auto_start = inputAutoStart ? inputAutoStart.checked : d.auto_start;
+    const name = d.name.trim();
+    const repo_url = d.repo_url.trim();
 
     if (!name) {
       state.formModal.error = 'Nama project tidak boleh kosong';
@@ -1286,28 +1298,28 @@ function attachEventListeners() {
     render();
 
     try {
-      const portNum = portRaw ? Number(portRaw) : null;
+      const portNum = d.port_manual.trim() ? Number(d.port_manual.trim()) : null;
       const validEnvs = d.env_vars.filter((ev) => ev.key.trim().length > 0);
 
       if (state.formModal.mode === 'create') {
         await createProject({
           name,
           repo_url,
-          branch,
+          branch: d.branch.trim() || 'main',
           port_manual: portNum,
-          build_cmd,
-          start_cmd,
-          auto_start,
+          build_cmd: d.build_cmd.trim() || 'npm install',
+          start_cmd: d.start_cmd.trim() || 'npm start',
+          auto_start: d.auto_start,
           env_vars: validEnvs,
         });
       } else if (state.formModal.projectId) {
         await updateProject(state.formModal.projectId, {
           repo_url,
-          branch,
+          branch: d.branch.trim() || 'main',
           port_manual: portNum,
-          build_cmd,
-          start_cmd,
-          auto_start,
+          build_cmd: d.build_cmd.trim() || 'npm install',
+          start_cmd: d.start_cmd.trim() || 'npm start',
+          auto_start: d.auto_start,
           env_vars: validEnvs,
         });
       }
@@ -1320,13 +1332,6 @@ function attachEventListeners() {
       render();
     }
   });
-}
-
-function scrollGitLogs() {
-  setTimeout(() => {
-    const el = document.getElementById('git-logs-content');
-    if (el) el.scrollTop = el.scrollHeight;
-  }, 40);
 }
 
 // -------------------------------------------------------------
@@ -1372,9 +1377,7 @@ async function init() {
   try {
     await onGitLog((ev: GitLogEvent) => {
       if (state.gitLogModal.isOpen && state.gitLogModal.projectId === ev.project_id) {
-        state.gitLogModal.logs.push(ev.line);
-        render();
-        scrollGitLogs();
+        appendGitTerminalLog(ev.line);
       }
     });
   } catch (e) {
