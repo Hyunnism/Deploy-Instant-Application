@@ -56,6 +56,9 @@ pub fn proot_exec(
         c.env(k, v);
     }
 
+    #[cfg(unix)]
+    c.process_group(0);
+
     c.kill_on_drop(true);
     c
 }

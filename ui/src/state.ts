@@ -92,6 +92,22 @@ export interface AppState {
     isRunning: boolean;
     statusMessage?: string | null;
   };
+  buildModal: {
+    isOpen: boolean;
+    projectId: number | null;
+    projectName: string;
+    isBuilding: boolean;
+    isCancelling: boolean;
+    logs: string[];
+    result: {
+      success: boolean;
+      exitCode?: number | null;
+      elapsedSeconds: number;
+      errorSummary?: string | null;
+      logFile?: string;
+    } | null;
+    statusMessage?: string | null;
+  };
   patSettings: {
     hasPat: boolean;
     inputPat: string;
@@ -163,6 +179,16 @@ export const state: AppState = {
     projectName: '',
     logs: [],
     isRunning: false,
+    statusMessage: null,
+  },
+  buildModal: {
+    isOpen: false,
+    projectId: null,
+    projectName: '',
+    isBuilding: false,
+    isCancelling: false,
+    logs: [],
+    result: null,
     statusMessage: null,
   },
   patSettings: {

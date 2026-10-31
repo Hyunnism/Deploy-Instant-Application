@@ -208,3 +208,43 @@ export async function onGitLog(
   });
 }
 
+// Fase 5: Build Production
+export interface BuildResult {
+  success: boolean;
+  exit_code?: number | null;
+  log_file: string;
+  elapsed_seconds: number;
+  error_summary?: string | null;
+}
+
+export interface BuildLogEvent {
+  project_id: number;
+  line: string;
+  stream: string;
+}
+
+export async function buildProject(id: number): Promise<BuildResult> {
+  return await invoke<BuildResult>('project_build', { id });
+}
+
+export async function cancelBuild(id: number): Promise<boolean> {
+  return await invoke<boolean>('project_build_cancel', { id });
+}
+
+export async function listBuildLogs(id: number): Promise<string[]> {
+  return await invoke<string[]>('project_build_logs_list', { id });
+}
+
+export async function readBuildLog(id: number, filename: string): Promise<string> {
+  return await invoke<string>('project_build_log_read', { id, filename });
+}
+
+export async function onBuildLog(
+  callback: (log: BuildLogEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<BuildLogEvent>('build:log', (event) => {
+    callback(event.payload);
+  });
+}
+
+

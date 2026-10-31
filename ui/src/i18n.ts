@@ -118,6 +118,21 @@ export const translations = {
     gitPatHelpText: 'Token dienkripsi menggunakan AES-256-GCM. Digunakan otomatis saat clone atau pull repository private GitHub tanpa membocorkan token.',
     gitPatSavedSuccess: 'Token GitHub PAT berhasil dienkripsi dan disimpan.',
     gitPatDeletedSuccess: 'Token GitHub PAT berhasil dihapus.',
+
+    // Fase 5 Build Production
+    buildBtn: 'Build',
+    buildingBtn: 'Membangun...',
+    cancelBuildBtn: 'Batalkan Build',
+    cancellingBuild: 'Membatalkan...',
+    buildSuccessBadge: '✓ Build Lulus',
+    buildFailedBadge: '✕ Build Gagal',
+    buildLogsModalTitle: 'Log Build Production',
+    buildLogsStreaming: 'Streaming proses kompilasi & instalasi npm',
+    buildSuccessSummary: 'Build berhasil diselesaikan',
+    buildFailedSummary: 'Build gagal dijalankan',
+    errorSummaryTitle: 'Ringkasan Error (50 Baris Terakhir)',
+    rebuildBtn: 'Build Ulang',
+    viewBuildLogBtn: 'Lihat Log',
   },
   en: {
     appName: 'Deploy Instant',
@@ -233,6 +248,21 @@ export const translations = {
     gitPatHelpText: 'Token is encrypted using AES-256-GCM. Used automatically during clone/pull on private GitHub repos without leaking credentials.',
     gitPatSavedSuccess: 'GitHub PAT encrypted and saved successfully.',
     gitPatDeletedSuccess: 'GitHub PAT removed successfully.',
+
+    // Fase 5 Build Production
+    buildBtn: 'Build',
+    buildingBtn: 'Building...',
+    cancelBuildBtn: 'Cancel Build',
+    cancellingBuild: 'Cancelling...',
+    buildSuccessBadge: '✓ Build Passed',
+    buildFailedBadge: '✕ Build Failed',
+    buildLogsModalTitle: 'Production Build Logs',
+    buildLogsStreaming: 'Streaming npm installation & compilation process',
+    buildSuccessSummary: 'Build completed successfully',
+    buildFailedSummary: 'Build execution failed',
+    errorSummaryTitle: 'Error Summary (Last 50 Lines)',
+    rebuildBtn: 'Rebuild',
+    viewBuildLogBtn: 'View Logs',
   },
 } as const;
 

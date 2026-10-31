@@ -677,6 +677,29 @@ impl Database {
         Ok(())
     }
 
+    /// Update status build terakhir project (Fase 5)
+    pub fn update_build_status(&self, id: i64, success: bool) -> Result<(), AppError> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::Internal(format!("Lock error: {e}")))?;
+
+        let rows_affected = conn
+            .execute(
+                "UPDATE projects SET last_build_ok = ?1, last_build_at = datetime('now'), updated_at = datetime('now') WHERE id = ?2;",
+                params![success, id],
+            )
+            .map_err(|e| AppError::Internal(format!("Gagal update status build: {e}")))?;
+
+        if rows_affected == 0 {
+            return Err(AppError::NotFound(format!(
+                "Project dengan ID {id} tidak ditemukan"
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Ambil nilai setting berdasarkan key
     pub fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
         let conn = self
@@ -850,6 +873,20 @@ mod tests {
         assert_eq!(updated.branch, "develop");
         assert_eq!(updated.port_manual, Some(8080));
         assert_eq!(updated.env_vars.as_ref().unwrap().len(), 2);
+
+        // 5b. Update build status (Fase 5)
+        db.update_build_status(created.id, true)
+            .expect("update build status ok");
+        let proj_built = db.get_project(created.id).expect("get project after build");
+        assert_eq!(proj_built.last_build_ok, Some(true));
+        assert!(proj_built.last_build_at.is_some());
+
+        // 5b. Update build status (Fase 5)
+        db.update_build_status(created.id, true)
+            .expect("update build status ok");
+        let proj_built = db.get_project(created.id).expect("get project after build");
+        assert_eq!(proj_built.last_build_ok, Some(true));
+        assert!(proj_built.last_build_at.is_some());
 
         // 6. Settings get/set
         let default_lang = db.get_setting("language").expect("get setting");

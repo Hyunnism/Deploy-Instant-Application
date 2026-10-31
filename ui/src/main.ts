@@ -4,6 +4,8 @@
 
 import './styles/index.css';
 import {
+  buildProject,
+  cancelBuild,
   checkSetupStatus,
   cloneProject,
   createProject,
@@ -12,16 +14,20 @@ import {
   getPatStatus,
   getRepoStatus,
   getSetting,
+  listBuildLogs,
   listProjects,
+  onBuildLog,
   onGitLog,
   onSetupProgress,
   pullProject,
+  readBuildLog,
   runProotProbe,
   savePat,
   setSetting,
   startSetup,
   updateProject,
   verifySetup,
+  type BuildLogEvent,
   type GitLogEvent,
   type Project,
 } from './api';
@@ -110,6 +116,84 @@ function updateGitModalStatus(subtitleText: string, isRunning: boolean) {
   }
 }
 
+function formatRelativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const isoStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return dateStr;
+  const now = Date.now();
+  const diffSec = Math.max(0, Math.floor((now - d.getTime()) / 1000));
+  if (diffSec < 60) return 'baru saja';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m lalu`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}j lalu`;
+  return `${Math.floor(diffSec / 86400)}h lalu`;
+}
+
+function appendBuildTerminalLog(line: string) {
+  // Batas buffer in-memory 5,000 baris sesuai PRD Fase 5
+  if (state.buildModal.logs.length >= 5000) {
+    state.buildModal.logs.shift();
+  }
+  state.buildModal.logs.push(line);
+
+  const container = document.getElementById('build-logs-content');
+  if (container) {
+    const placeholder = container.querySelector('.log-line.muted');
+    if (placeholder) placeholder.remove();
+
+    if (container.children.length >= 5000) {
+      container.removeChild(container.firstElementChild!);
+    }
+
+    let cls = 'step';
+    if (line.includes('==> Memulai') || line.includes('Perintah:') || line.includes('npm')) cls = 'step';
+    else if (line.includes('BERHASIL') || line.includes('added ') || line.includes('audited ') || line.includes('found 0 vulnerabilities')) cls = 'success';
+    else if (line.includes('WARN') || line.includes('deprecated') || line.includes('npm notice')) cls = 'warn';
+    else if (line.includes('GAGAL') || line.includes('ERR!') || line.includes('error') || line.includes('fatal')) cls = 'error';
+
+    const div = document.createElement('div');
+    div.className = `log-line ${cls}`;
+    div.textContent = line;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function updateBuildModalStatus(subtitleText: string, isBuilding: boolean, errorSummary?: string | null) {
+  state.buildModal.isBuilding = isBuilding;
+  state.buildModal.statusMessage = subtitleText;
+
+  const subEl = document.getElementById('build-modal-subtitle');
+  if (subEl) {
+    subEl.textContent = subtitleText;
+  }
+  const btnClose = document.getElementById('btn-footer-close-build-modal');
+  if (btnClose) {
+    btnClose.textContent = isBuilding ? 'Tutup Tampilan (Berjalan di Background)' : t('modalClose');
+  }
+
+  const cancelBtn = document.getElementById('btn-cancel-build-action');
+  if (cancelBtn) {
+    cancelBtn.style.display = isBuilding ? 'inline-block' : 'none';
+  }
+
+  const rebuildBtn = document.getElementById('btn-rebuild-modal');
+  if (rebuildBtn) {
+    rebuildBtn.style.display = !isBuilding ? 'inline-block' : 'none';
+  }
+
+  const errWrap = document.getElementById('build-error-summary-wrap');
+  const errBody = document.getElementById('build-error-summary-body');
+  if (errWrap && errBody) {
+    if (errorSummary) {
+      errBody.textContent = errorSummary;
+      errWrap.style.display = 'flex';
+    } else {
+      errWrap.style.display = 'none';
+    }
+  }
+}
+
 // -------------------------------------------------------------
 // RENDER CONTROLLER
 // -------------------------------------------------------------
@@ -147,6 +231,7 @@ function render() {
       ${renderDeleteModal()}
       ${renderEngineModal()}
       ${renderGitLogModal()}
+      ${renderBuildModal()}
     </div>
   `;
 
@@ -227,6 +312,7 @@ function renderProjectCard(p: Project): string {
   const portLabel = p.port_manual ? `Port ${p.port_manual}` : 'Port Auto';
   const repo = state.repoStatuses[p.id];
   const isCloned = repo?.is_cloned ?? false;
+  const isBuildingThis = state.buildModal.isOpen && state.buildModal.isBuilding && state.buildModal.projectId === p.id;
 
   return `
     <div class="project-card" data-id="${p.id}">
@@ -240,9 +326,14 @@ function renderProjectCard(p: Project): string {
       ? `<button class="proj-action-btn clone btn-clone-project" data-id="${p.id}" ${repo?.isCloning ? 'disabled' : ''}>
                    ${repo?.isCloning ? t('cloningRepo') : t('cloneRepoBtn')}
                  </button>`
-      : `<button class="proj-action-btn pull btn-pull-project" data-id="${p.id}" ${repo?.isPulling ? 'disabled' : ''}>
-                   ${repo?.isPulling ? t('pullingRepo') : t('pullBtn')}
-                 </button>`
+      : `
+         <button class="proj-action-btn pull btn-pull-project" data-id="${p.id}" ${repo?.isPulling ? 'disabled' : ''}>
+           ${repo?.isPulling ? t('pullingRepo') : t('pullBtn')}
+         </button>
+         <button class="proj-action-btn build btn-build-project ${isBuildingThis ? 'running' : ''}" data-id="${p.id}" ${isBuildingThis ? 'disabled' : ''}>
+           ${isBuildingThis ? t('buildingBtn') : t('buildBtn')}
+         </button>
+        `
     }
           <button class="proj-action-btn edit btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
           <button class="proj-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
@@ -253,6 +344,23 @@ function renderProjectCard(p: Project): string {
         ${isCloned && repo?.commit_hash
       ? `<span class="meta-badge commit-hash">#${repo.commit_hash}</span>`
       : `<span class="meta-badge not-cloned" style="color: #94a3b8; font-style: italic;">${t('notClonedBadge')}</span>`
+    }
+        ${isBuildingThis
+      ? `<span class="meta-badge build-running">
+           <span class="meta-dot" style="background: #3b82f6;"></span>
+           ${t('buildingBtn')}
+         </span>`
+      : (p.last_build_ok === true
+        ? `<span class="meta-badge build-ok btn-view-build-log" data-id="${p.id}" style="cursor: pointer;" title="${t('viewBuildLogBtn')}">
+             ${t('buildSuccessBadge')} • ${formatRelativeTime(p.last_build_at)}
+           </span>`
+        : (p.last_build_ok === false
+          ? `<span class="meta-badge build-failed btn-view-build-log" data-id="${p.id}" style="cursor: pointer;" title="${t('viewBuildLogBtn')}">
+               ${t('buildFailedBadge')} • ${formatRelativeTime(p.last_build_at)}
+             </span>`
+          : ''
+        )
+      )
     }
         <span class="meta-badge">
           <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -799,6 +907,114 @@ function renderGitLogModal(): string {
 }
 
 // -------------------------------------------------------------
+// BUILD TERMINAL MODAL (FASE 5 PRODUCTION BUILD STREAMING)
+// -------------------------------------------------------------
+function renderBuildModal(): string {
+  const modal = state.buildModal;
+  if (!modal.isOpen) return '';
+
+  const isBuilding = modal.isBuilding;
+  const isOk = modal.result?.success;
+  const isFailed = modal.result !== null && !modal.result.success;
+
+  let badgeCls = 'warning';
+  let badgeText = isBuilding ? t('buildingBtn') : (modal.statusMessage || t('statusReady'));
+  if (isBuilding) {
+    badgeCls = 'warning';
+    badgeText = t('buildingBtn');
+  } else if (isOk) {
+    badgeCls = 'healthy';
+    badgeText = t('buildSuccessBadge');
+  } else if (isFailed) {
+    badgeCls = 'error';
+    badgeText = t('buildFailedBadge');
+  }
+
+  return `
+    <div class="modal-overlay" id="build-modal-overlay">
+      <div class="modal-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <div>
+            <h3 class="modal-title">${t('buildLogsModalTitle')}</h3>
+            <div id="build-modal-subtitle" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+              ${modal.statusMessage || (isBuilding ? 'Sedang mengeksekusi di rootfs container...' : 'Proses build selesai.')}
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-build-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Hero Card: Reference Image 2 Style -->
+          <div class="engine-hero-card" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+              <div class="engine-hero-icon" style="background: linear-gradient(135deg, #2563eb, #3b82f6);">
+                📦
+              </div>
+              <div class="engine-hero-info">
+                <span class="engine-hero-title">${modal.projectName}</span>
+                <span class="engine-hero-sub">
+                  ${modal.result ? `${modal.result.elapsedSeconds}s • Node.js LTS` : 'Node.js LTS • Production'}
+                </span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status-badge ${badgeCls}">${badgeText}</span>
+              ${isBuilding
+                ? `<button class="btn-cancel-build" id="btn-cancel-build-action" ${modal.isCancelling ? 'disabled' : ''}>
+                     ${modal.isCancelling ? t('cancellingBuild') : t('cancelBuildBtn')}
+                   </button>`
+                : `<button class="btn-rebuild" id="btn-rebuild-modal" data-id="${modal.projectId || ''}">
+                     ${t('rebuildBtn')}
+                   </button>`
+              }
+            </div>
+          </div>
+
+          <!-- Error Summary Box (jika build gagal) -->
+          <div class="build-error-summary" id="build-error-summary-wrap" style="${modal.result?.errorSummary ? 'display: flex;' : 'display: none;'}">
+            <div class="build-error-summary-header">
+              <span>⚠️</span>
+              <span>${t('errorSummaryTitle')}</span>
+            </div>
+            <div class="build-error-summary-body" id="build-error-summary-body">
+              ${escapeHtml(modal.result?.errorSummary || '')}
+            </div>
+          </div>
+
+          <!-- Terminal Logs (Ref 2 Recent Logs Style) -->
+          <div class="engine-logs-section" style="margin-top: 2px;">
+            <div class="engine-logs-header">
+              <span class="engine-logs-title">${t('buildLogsStreaming')}</span>
+              <button class="engine-logs-copy" id="btn-copy-build-logs">${t('copyLogsBtn')}</button>
+            </div>
+            <div class="engine-logs-box" id="build-logs-content" style="min-height: 220px; max-height: 340px;">
+              ${modal.logs.length > 0
+                ? modal.logs.map((line) => {
+                    let cls = 'step';
+                    if (line.includes('==> Memulai') || line.includes('Perintah:') || line.includes('npm')) cls = 'step';
+                    else if (line.includes('BERHASIL') || line.includes('added ') || line.includes('audited ') || line.includes('found 0 vulnerabilities')) cls = 'success';
+                    else if (line.includes('WARN') || line.includes('deprecated') || line.includes('npm notice')) cls = 'warn';
+                    else if (line.includes('GAGAL') || line.includes('ERR!') || line.includes('error') || line.includes('fatal')) cls = 'error';
+                    return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+                  }).join('')
+                : `<div class="log-line muted">Menunggu instruksi build...</div>`
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn primary" id="btn-footer-close-build-modal" style="width: 100%;">
+            ${isBuilding ? 'Tutup Tampilan (Berjalan di Background)' : t('modalClose')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // EVENT LISTENERS & USER ACTIONS
 // -------------------------------------------------------------
 function attachEventListeners() {
@@ -1135,6 +1351,161 @@ function attachEventListeners() {
     });
   });
 
+  // -----------------------------------------------------------
+  // FASE 5 BUILD ACTIONS
+  // -----------------------------------------------------------
+  const startBuildForProject = async (id: number) => {
+    const proj = state.projects.find((p) => p.id === id);
+    if (!proj) return;
+
+    state.buildModal = {
+      isOpen: true,
+      projectId: id,
+      projectName: proj.name,
+      isBuilding: true,
+      isCancelling: false,
+      logs: [],
+      result: null,
+      statusMessage: 'Sedang mengeksekusi build di rootfs sandbox...',
+    };
+    render();
+
+    try {
+      const res = await buildProject(id);
+      state.buildModal.result = {
+        success: res.success,
+        exitCode: res.exit_code,
+        elapsedSeconds: res.elapsed_seconds,
+        errorSummary: res.error_summary,
+        logFile: res.log_file,
+      };
+      state.buildModal.isBuilding = false;
+
+      // Update status build project di memori
+      const pIdx = state.projects.findIndex((p) => p.id === id);
+      if (pIdx !== -1) {
+        state.projects[pIdx].last_build_ok = res.success;
+        state.projects[pIdx].last_build_at = new Date().toISOString();
+      }
+
+      const msg = res.success
+        ? `Build berhasil dalam ${res.elapsed_seconds}s!`
+        : `Build gagal (exit code: ${res.exit_code ?? '?'})`;
+      updateBuildModalStatus(msg, false, res.error_summary);
+    } catch (err: any) {
+      state.buildModal.isBuilding = false;
+      const errMsg = String(err);
+      state.buildModal.result = {
+        success: false,
+        exitCode: null,
+        elapsedSeconds: 0,
+        errorSummary: errMsg,
+      };
+      updateBuildModalStatus(`Build error: ${errMsg}`, false, errMsg);
+      appendBuildTerminalLog(`[ERROR] ${errMsg}`);
+    }
+  };
+
+  // Tombol Build pada Project Card
+  document.querySelectorAll('.btn-build-project').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = Number(el.getAttribute('data-id'));
+      startBuildForProject(id);
+    });
+  });
+
+  // Tombol Build Ulang pada Modal Build
+  document.getElementById('btn-rebuild-modal')?.addEventListener('click', () => {
+    if (state.buildModal.projectId) {
+      startBuildForProject(state.buildModal.projectId);
+    }
+  });
+
+  // Tombol Batalkan Build
+  document.getElementById('btn-cancel-build-action')?.addEventListener('click', async () => {
+    if (!state.buildModal.projectId || !state.buildModal.isBuilding) return;
+    state.buildModal.isCancelling = true;
+    const btn = document.getElementById('btn-cancel-build-action');
+    if (btn) btn.textContent = t('cancellingBuild');
+    try {
+      await cancelBuild(state.buildModal.projectId);
+    } catch (e) {
+      console.error('Cancel build error:', e);
+    }
+  });
+
+  // Modal Build Close Handlers
+  const closeBuildModal = () => {
+    state.buildModal.isOpen = false;
+    render();
+  };
+  document.getElementById('btn-close-build-modal')?.addEventListener('click', closeBuildModal);
+  document.getElementById('btn-footer-close-build-modal')?.addEventListener('click', closeBuildModal);
+
+  // Salin Log Build
+  document.getElementById('btn-copy-build-logs')?.addEventListener('click', async () => {
+    const text = state.buildModal.logs.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('btn-copy-build-logs');
+      if (btn) btn.textContent = t('logsCopied');
+      setTimeout(() => {
+        if (btn) btn.textContent = t('copyLogsBtn');
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  // Klik Badge Build untuk membuka Log Viewer
+  document.querySelectorAll('.btn-view-build-log').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      try {
+        const logsList = await listBuildLogs(id);
+        if (logsList.length === 0) {
+          state.buildModal = {
+            isOpen: true,
+            projectId: id,
+            projectName: proj.name,
+            isBuilding: false,
+            isCancelling: false,
+            logs: ['(Belum ada file log build untuk project ini)'],
+            result: null,
+            statusMessage: 'Belum ada log tersimpan',
+          };
+          render();
+          return;
+        }
+
+        const latestFile = logsList[0];
+        const content = await readBuildLog(id, latestFile);
+        const lines = content.split('\n');
+
+        state.buildModal = {
+          isOpen: true,
+          projectId: id,
+          projectName: proj.name,
+          isBuilding: false,
+          isCancelling: false,
+          logs: lines,
+          result: {
+            success: proj.last_build_ok ?? false,
+            elapsedSeconds: 0,
+            logFile: latestFile,
+          },
+          statusMessage: `Menampilkan file log: ${latestFile}`,
+        };
+        render();
+      } catch (e: any) {
+        console.error('View build log error:', e);
+      }
+    });
+  });
+
   // Project Create buttons
   const openCreateModal = () => {
     state.formModal = {
@@ -1382,6 +1753,17 @@ async function init() {
     });
   } catch (e) {
     console.error('Failed to register git:log listener:', e);
+  }
+
+  // Listen to Build streaming logs (Fase 5)
+  try {
+    await onBuildLog((ev: BuildLogEvent) => {
+      if (state.buildModal.isOpen && state.buildModal.projectId === ev.project_id) {
+        appendBuildTerminalLog(ev.line);
+      }
+    });
+  } catch (e) {
+    console.error('Failed to register build:log listener:', e);
   }
 
   // Load language setting

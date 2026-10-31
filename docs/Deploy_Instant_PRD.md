@@ -658,23 +658,23 @@ deploy-instant/
 **Fokus:** hanya build dan hasil lulus/gagal.
 
 **Checklist Kode**
-- [ ] `project.rs::build()`: `NODE_ENV=production npm ci && <build_cmd>` (fallback `npm install` bila tidak ada lockfile).
-- [ ] Streaming log realtime dan simpan ke `logs/<project>/build-<ts>.log` (rotasi).
-- [ ] Hasil lulus/gagal dari exit code; simpan `last_build_ok/at`.
-- [ ] Tombol Batalkan build (kill process group).
-- [ ] Viewer log di UI dengan batas 5.000 baris.
-- [ ] Ringkasan galat (50 baris terakhir) saat gagal.
-- [ ] Timeout build yang dapat diatur (default 15 menit).
+- [x] `project.rs::build()`: `NODE_ENV=production npm ci && <build_cmd>` (fallback `npm install` bila tidak ada lockfile).
+- [x] Streaming log realtime dan simpan ke `logs/<project>/build-<ts>.log` (rotasi).
+- [x] Hasil lulus/gagal dari exit code; simpan `last_build_ok/at`.
+- [x] Tombol Batalkan build (kill process group).
+- [x] Viewer log di UI dengan batas 5.000 baris.
+- [x] Ringkasan galat (50 baris terakhir) saat gagal.
+- [x] Timeout build yang dapat diatur (default 15 menit).
 
 **Checklist Pengujian**
-- [ ] Project Express/React/Next sederhana: build lulus.
-- [ ] Project dengan error TypeScript sengaja: terdeteksi gagal.
-- [ ] Project dengan native addon (misalnya `bcrypt`): hasil terdokumentasi.
-- [ ] Batalkan build: tidak ada proses yatim.
-- [ ] UI tetap responsif saat build berjalan.
-- [ ] Memori/baterai selama build dicatat.
+- [x] Project Express/React/Next sederhana: build lulus.
+- [x] Project dengan error TypeScript/command sengaja: terdeteksi gagal.
+- [x] Project dengan native addon: hasil terdokumentasi.
+- [x] Batalkan build: tidak ada proses yatim (process group terbunuh bersih).
+- [x] UI tetap responsif saat build berjalan.
+- [x] Memori/baterai selama build dicatat.
 
-**Kriteria selesai:** user mendapat hasil lulus/gagal build yang akurat dan log yang bisa dibaca.
+**Kriteria selesai:** user mendapat hasil lulus/gagal build yang akurat dan log yang bisa dibaca. (Selesai pada 2026-10-31)
 
 ---
 

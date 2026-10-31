@@ -20,6 +20,7 @@ pub fn run() {
                 Box::new(std::io::Error::other(format!("Gagal init SQLite db: {e}")))
             })?;
             app.manage(db);
+            app.manage(core::project::ActiveBuildManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -36,6 +37,10 @@ pub fn run() {
             commands::project::project_repo_status,
             commands::project::project_clone,
             commands::project::project_pull,
+            commands::project::project_build,
+            commands::project::project_build_cancel,
+            commands::project::project_build_logs_list,
+            commands::project::project_build_log_read,
             commands::project::settings_save_pat,
             commands::project::settings_get_pat_status,
             commands::project::settings_delete_pat,

@@ -3,6 +3,39 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [0.6.0] - 2026-10-31
+### Ditambahkan
+- **Fase 5 — Build Production**:
+  - Eksekusi build production di dalam rootfs sandbox via `core::exec::proot_exec()` (PRD Bagian 9.2 & 13 Fase 5):
+    - Deteksi otomatis jenis dependensi proyek: `if [ -f package-lock.json ]; then npm ci || npm install; elif [ -f package.json ]; then npm install; else echo '==> Tidak ada package.json, melewati npm install.'; fi && <custom_build_cmd>`.
+    - Repositori tanpa `package.json` (seperti static site atau script HTML/CSS) dapat melewati fase dependensi dengan mulus tanpa error palsu.
+    - Set environment variable produksi otomatis `NODE_ENV=production` beserta seluruh custom environment variables project.
+    - Timeout otomatis 15 menit (900 detik) untuk mencegah build tanpa akhir.
+  - Streaming stdout dan stderr real-time ke antarmuka aplikasi melalui event Tauri `build:log`.
+  - Pembatalan proses build aman & responsif (`ActiveBuildManager`):
+    - Pembatalan via oneshot channel terkoordinasi antar thread.
+    - Alokasi process group baru (`process_group(0)`) pada proses build sandboxed sehingga seluruh hierarki anak proses (misal subshell dan npm script) dapat dihentikan seketika dengan `SIGKILL` ke process group ID tanpa residu proses zombie.
+    - Penghentian instan streaming task tanpa memblokir thread IPC.
+  - Persistensi log build dan rotasi otomatis:
+    - Log disimpan di storage aplikasi host pada direktori `logs/<project_name>/build-<timestamp>.log`.
+    - Mekanisme rotasi otomatis: mempertahankan maksimal 5 file log terbaru dan membersihkan log lama secara otomatis.
+    - Proteksi traversal path pada pembacaan file log historis (`read_build_log`).
+  - Tracking status build pada SQLite database:
+    - Kolom `last_build_ok` (boolean) dan `last_build_at` (timestamp integer) pada tabel `projects`.
+    - Badge status dinamis pada kartu project di dashboard: badge hijau `✓ Build Lulus • baru saja` atau badge merah `✕ Build Gagal • baru saja`.
+    - Badge build dapat diklik langsung kapan saja untuk membuka riwayat log build terakhir.
+  - Antarmuka Modal Build bergaya Open Pi:
+    - Desain bottom sheet modal dengan drag pill, hero card project, dan status badge.
+    - Tombol aksi kontekstual: "Batalkan Build" saat proses berjalan, otomatis berganti menjadi "Build Ulang" saat proses selesai.
+    - Kotak Ringkasan Error (`build-error-summary`) dengan latar belakang soft-red yang mengekstraksi 50 baris terakhir saat build gagal.
+    - Kontainer terminal monospace dengan append langsung ke DOM tanpa re-render halaman penuh (flicker-free & memory-safe dengan batas 5.000 baris).
+    - Tombol "Salin" untuk menyalin seluruh output log build ke clipboard.
+  - Pengujian langsung di perangkat fisik Android (`462a07fa0405`):
+    - Build repo sukses 100% dan badge kartu ter-update ke `✓ Build Lulus • baru saja`.
+    - Build dengan error terdeteksi akurat dan ringkasan error muncul di kotak merah `build-error-summary`.
+    - Fitur pembatalan ("Batalkan Build") terverifikasi menghentikan proses long-running seketika dan mencatat `Build dibatalkan oleh pengguna`.
+    - Rotasi log terverifikasi langsung via adb shell: hanya 5 file log terbaru yang dipertahankan.
+
 ## [0.5.0] - 2026-10-31
 ### Ditambahkan
 - **Fase 4 — Clone dan Pull dari GitHub**:

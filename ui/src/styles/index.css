@@ -1205,53 +1205,127 @@ body {
   color: var(--text-muted);
 }
 
-
-/* Fase 4 Git & PAT Styles */
-.pat-input-wrapper {
-  display: flex;
-  position: relative;
-  width: 100%;
-}
-
-.pat-input-wrapper input {
-  padding-right: 44px;
-}
-
-.pat-eye-btn {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  border: none;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pat-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.meta-badge.commit-hash {
-  background: #f8fafc;
-  color: #0f172a;
-  font-family: var(--font-mono);
+/* Fase 5 Build Production Styles */
+.meta-badge.build-ok {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
   font-weight: 600;
-  border-color: #cbd5e1;
 }
 
-.meta-badge.commit-msg {
-  max-width: 180px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-muted);
+.meta-badge.build-failed {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.meta-badge.build-running {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.card-action-btn.build-btn {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+}
+
+.card-action-btn.build-btn:hover {
+  background: #f1f5f9;
+}
+
+.card-action-btn.build-btn.running {
+  color: #2563eb;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.build-error-summary {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.build-error-summary-header {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #991b1b;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.build-error-summary-body {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #7f1d1d;
+  max-height: 130px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #ffffff;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid #fee2e2;
+}
+
+.btn-cancel-build {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #b91c1c;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-cancel-build:active {
+  background: #fecaca;
+  transform: scale(0.97);
+}
+
+.btn-rebuild {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-rebuild:active {
+  background: #dbeafe;
+  transform: scale(0.97);
+}
+
+
+.btn-rebuild {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-rebuild:active {
+  background: #dbeafe;
+  transform: scale(0.97);
 }

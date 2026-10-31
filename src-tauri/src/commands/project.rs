@@ -3,7 +3,8 @@
 
 use crate::core::project as core_project;
 use crate::models::{
-    CreateProjectInput, PatStatus, Project, PullResult, RepoStatus, SettingItem, UpdateProjectInput,
+    BuildResult, CreateProjectInput, PatStatus, Project, PullResult, RepoStatus, SettingItem,
+    UpdateProjectInput,
 };
 use crate::storage::db::Database;
 use crate::storage::secrets;
@@ -153,4 +154,65 @@ pub fn setting_set(db: State<'_, Database>, key: String, value: String) -> Resul
 #[tauri::command]
 pub fn setting_list(db: State<'_, Database>) -> Result<Vec<SettingItem>, String> {
     db.list_settings().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn project_build(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+    build_manager: State<'_, core_project::ActiveBuildManager>,
+    id: i64,
+) -> Result<BuildResult, String> {
+    let proj = db.get_project(id).map_err(|e| e.to_string())?;
+    let app_files_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Gagal mendapatkan app data dir: {e}"))?;
+    let rootfs_dir = app_files_dir.join("rootfs");
+
+    let result =
+        core_project::build_project(&app, &rootfs_dir, &app_files_dir, &proj, &build_manager)
+            .await
+            .map_err(|e| e.to_string())?;
+
+    let _ = db.update_build_status(id, result.success);
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn project_build_cancel(
+    build_manager: State<'_, core_project::ActiveBuildManager>,
+    id: i64,
+) -> Result<bool, String> {
+    Ok(build_manager.cancel(id))
+}
+
+#[tauri::command]
+pub fn project_build_logs_list(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+    id: i64,
+) -> Result<Vec<String>, String> {
+    let proj = db.get_project(id).map_err(|e| e.to_string())?;
+    let app_files_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Gagal app data dir: {e}"))?;
+    Ok(core_project::list_build_logs(&app_files_dir, &proj.name))
+}
+
+#[tauri::command]
+pub fn project_build_log_read(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+    id: i64,
+    filename: String,
+) -> Result<String, String> {
+    let proj = db.get_project(id).map_err(|e| e.to_string())?;
+    let app_files_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Gagal app data dir: {e}"))?;
+    core_project::read_build_log(&app_files_dir, &proj.name, &filename).map_err(|e| e.to_string())
 }

@@ -141,3 +141,21 @@ pub struct PullResult {
 pub struct PatStatus {
     pub has_pat: bool,
 }
+
+/// Hasil eksekusi build project (PRD Bagian 9.2 & 13 Fase 5)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildResult {
+    pub success: bool,
+    pub exit_code: Option<i32>,
+    pub log_file: String,
+    pub elapsed_seconds: u64,
+    pub error_summary: Option<String>,
+}
+
+/// Realtime build log event (PRD Bagian 10 & 13 Fase 5)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildLogEvent {
+    pub project_id: i64,
+    pub line: String,
+    pub stream: String, // "stdout" | "stderr"
+}
