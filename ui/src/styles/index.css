@@ -154,19 +154,70 @@ body {
   box-shadow: var(--shadow-md);
 }
 
-.overview-header-actions {
-  display: flex;
+/* Engine Status Pill - Unified, pixel-perfect indicator and action */
+.engine-status-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  background: var(--success-bg);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: var(--success-text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.overview-detail-pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--accent-blue);
-  background: var(--accent-blue-bg);
-  padding: 3px 8px;
-  border-radius: 12px;
+.engine-status-pill.warning {
+  background: var(--warning-bg);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--warning-text);
+}
+
+.engine-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--success);
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.engine-status-pill.warning .engine-status-dot {
+  background-color: var(--warning);
+}
+
+.engine-status-text {
+  margin-left: 6px;
+  line-height: 1;
+}
+
+.engine-status-sep {
+  width: 1px;
+  height: 12px;
+  background-color: rgba(16, 185, 129, 0.35);
+  margin: 0 8px;
+  flex-shrink: 0;
+}
+
+.engine-status-pill.warning .engine-status-sep {
+  background-color: rgba(245, 158, 11, 0.35);
+}
+
+.engine-status-detail {
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: #059669;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.engine-status-pill.warning .engine-status-detail {
+  color: #d97706;
 }
 
 .overview-header {
@@ -343,7 +394,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
 }
 
 .project-identity {
@@ -351,105 +402,122 @@ body {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1;
 }
 
 .project-icon-box {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   flex-shrink: 0;
 }
 
-.project-name-wrap {
-  min-width: 0;
-}
-
 .project-name {
-  font-size: 0.98rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.01em;
 }
 
-.project-badges-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.badge-pill {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 6px;
-  background: var(--bg-app);
-  color: var(--text-muted);
-  border: 1px solid var(--border-light);
-}
-
-.badge-pill.branch {
-  color: #2563eb;
-  background: #eff6ff;
-  border-color: #dbeafe;
-}
-
-.badge-pill.port {
-  color: #059669;
-  background: #ecfdf5;
-  border-color: #d1fae5;
-  font-family: var(--font-mono);
-}
-
-.badge-pill.autostart {
-  color: #7c3aed;
-  background: #f5f3ff;
-  border-color: #ede9fe;
-}
-
+/* Action buttons: Sleek, quiet, perfectly proportioned */
 .project-card-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
-.icon-action-btn {
-  background: transparent;
-  border: 1px solid var(--border-light);
+.proj-action-btn {
+  height: 28px;
+  padding: 0 12px;
   border-radius: 8px;
-  padding: 5px 9px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
-.icon-action-btn:hover {
-  background: var(--bg-app);
+.proj-action-btn.edit {
+  background: #ffffff;
+  border: 1px solid var(--border-light);
   color: var(--text-main);
 }
 
-.icon-action-btn.delete {
-  color: var(--danger-text);
-  border-color: rgba(220, 38, 38, 0.2);
+.proj-action-btn.edit:active {
+  background: var(--bg-app);
 }
 
-.icon-action-btn.delete:hover {
-  background: var(--danger-bg);
+.proj-action-btn.delete {
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #dc2626;
+}
+
+.proj-action-btn.delete:active {
+  background: #fee2e2;
+}
+
+/* Project Meta Row: Dedicated, cleanly spaced metadata line */
+.project-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+  font-size: 0.73rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.meta-badge .meta-svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.meta-badge.autostart {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.meta-badge .meta-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+  display: inline-block;
 }
 
 /* Repo URL line */
 .project-repo-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 0.78rem;
   font-family: var(--font-mono);
   color: var(--text-muted);
@@ -457,9 +525,19 @@ body {
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-light);
+  overflow: hidden;
+}
+
+.project-repo-line .meta-svg {
+  color: var(--text-subtle);
+  flex-shrink: 0;
+}
+
+.project-repo-line .repo-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* Detail mini grid */

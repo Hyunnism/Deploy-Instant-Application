@@ -71,7 +71,7 @@ export const translations = {
     reverifyBtn: 'Periksa Ulang Toolchain',
     engineNotInstalled: 'Lingkungan server belum terpasang di perangkat ini.',
     engineInstalledDesc: 'Seluruh dependensi utama siap menjalankan aplikasi Node.js mandiri.',
-    viewDetailPill: 'Detail ➔',
+    viewDetailPill: 'Detail ›',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Hapus Project?',
@@ -162,7 +162,7 @@ export const translations = {
     reverifyBtn: 'Re-check Toolchain',
     engineNotInstalled: 'Server environment is not installed on this device.',
     engineInstalledDesc: 'All primary dependencies are ready to execute Node.js applications autonomously.',
-    viewDetailPill: 'Details ➔',
+    viewDetailPill: 'Details ›',
     
     // Delete Confirmation Modal
     modalDeleteTitle: 'Delete Project?',

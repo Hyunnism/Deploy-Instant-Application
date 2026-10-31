@@ -90,11 +90,11 @@ function renderDashboardView(isReady: boolean): string {
           <h2>${t('activeEngine')}</h2>
           <div class="overview-subtitle">${t('toolchainHeader')}</div>
         </div>
-        <div class="overview-header-actions">
-          <div class="status-badge ${isReady ? 'healthy' : 'warning'}">
-            ${isReady ? t('statusReady') : t('statusNotReady')}
-          </div>
-          <span class="overview-detail-pill">${t('viewDetailPill')}</span>
+        <div class="engine-status-pill ${isReady ? 'healthy' : 'warning'}">
+          <span class="engine-status-dot"></span>
+          <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
+          <span class="engine-status-sep"></span>
+          <span class="engine-status-detail">${t('viewDetailPill')}</span>
         </div>
       </div>
       <div class="overview-metrics">
@@ -148,29 +148,56 @@ function renderEmptyState(): string {
 
 function renderProjectCard(p: Project): string {
   const initial = (p.name.charAt(0) || 'P').toUpperCase();
-  const portStr = p.port_manual ? `:${p.port_manual}` : ':auto';
+  const portLabel = p.port_manual ? `Port ${p.port_manual}` : 'Port Auto';
 
   return `
     <div class="project-card" data-id="${p.id}">
       <div class="project-card-header">
         <div class="project-identity">
           <div class="project-icon-box">${initial}</div>
-          <div class="project-name-wrap">
-            <div class="project-name">${p.name}</div>
-            <div class="project-badges-row">
-              <span class="badge-pill branch">${p.branch}</span>
-              <span class="badge-pill port">${portStr}</span>
-              ${p.auto_start ? `<span class="badge-pill autostart">${t('autoStartBadge')}</span>` : ''}
-            </div>
-          </div>
+          <div class="project-name">${p.name}</div>
         </div>
         <div class="project-card-actions">
-          <button class="icon-action-btn btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
-          <button class="icon-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
+          <button class="proj-action-btn edit btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
+          <button class="proj-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
         </div>
       </div>
 
-      <div class="project-repo-line">${p.repo_url}</div>
+      <div class="project-meta-row">
+        <span class="meta-badge">
+          <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="6" y1="3" x2="6" y2="15"></line>
+            <circle cx="18" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <path d="M18 9a9 9 0 0 1-9 9"></path>
+          </svg>
+          ${p.branch}
+        </span>
+        <span class="meta-badge">
+          <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+            <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            <line x1="6" y1="6" x2="6.01" y2="6"></line>
+            <line x1="6" y1="18" x2="6.01" y2="18"></line>
+          </svg>
+          ${portLabel}
+        </span>
+        ${
+          p.auto_start
+            ? `<span class="meta-badge autostart">
+                 <span class="meta-dot"></span>
+                 ${t('autoStartBadge')}
+               </span>`
+            : ''
+        }
+      </div>
+
+      <div class="project-repo-line">
+        <svg class="meta-svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+        </svg>
+        <span class="repo-text">${p.repo_url}</span>
+      </div>
 
       <div class="project-commands-grid">
         <div class="command-box">
