@@ -564,12 +564,7 @@ function renderProjectCard(p: Project): string {
               <div class="project-dropdown-menu">
                 ${pm2?.status === 'online' ? `
                   <button class="dropdown-item btn-open-local" data-port="${activePort}">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                    </svg>
-                    <span>${t('openLocalBtn')} (:${activePort})</span>
+                    <span>${t('openLocalTitle')} (:${activePort})</span>
                   </button>
                   <div class="dropdown-divider"></div>
                 ` : ''}
@@ -617,7 +612,7 @@ function renderProjectCard(p: Project): string {
          ${pm2?.status === 'online'
         ? `
               <button class="proj-action-btn open-local btn-open-local" data-port="${activePort}" title="${t('openLocalTitle')}">
-                ↗ ${t('openLocalBtn')}
+                ${t('openLocalBtn')}
               </button>
               <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
                 ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
@@ -704,7 +699,7 @@ function renderProjectCard(p: Project): string {
         </span>
         ${pm2?.status === 'online' && pm2.detected_port && pm2.port && pm2.detected_port !== pm2.port
       ? `<span class="meta-badge port-detected" title="${t('detectedPortLabel')}: ${pm2.detected_port}">
-           ⚡ ${t('detectedPortLabel')}: ${pm2.detected_port}
+           ${t('detectedPortLabel')}: ${pm2.detected_port}
          </span>`
       : ''
     }
@@ -732,7 +727,7 @@ function renderProjectCard(p: Project): string {
            <div class="project-runtime-metrics">
              <div class="runtime-metric-item">
                <span class="lbl">${t('detectedPort')}</span>
-               <span class="val" style="color: #059669;">:${activePort}${pm2.detected_port && pm2.port && pm2.detected_port !== pm2.port ? ` (⚡${pm2.detected_port})` : ''}</span>
+               <span class="val" style="color: #059669;">:${activePort}${pm2.detected_port && pm2.port && pm2.detected_port !== pm2.port ? ` (${pm2.detected_port})` : ''}</span>
              </div>
              <div class="runtime-metric-item">
                <span class="lbl">${t('metricCpu')}</span>

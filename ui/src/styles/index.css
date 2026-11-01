@@ -551,7 +551,7 @@ body {
 .project-card-actions {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -559,9 +559,10 @@ body {
 .proj-action-btn {
   height: 32px;
   width: 100%;
-  padding: 0 4px;
+  min-width: 0;
+  padding: 0 2px;
   border-radius: 8px;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -571,6 +572,8 @@ body {
   line-height: 1;
   white-space: nowrap;
   box-sizing: border-box;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .proj-action-btn.clone {

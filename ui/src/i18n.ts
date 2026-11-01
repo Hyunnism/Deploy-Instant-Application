@@ -181,8 +181,8 @@ export const translations = {
     noRuntimeLogsYet: 'Belum ada log runtime yang tercatat...',
 
     // Fase 9 Port & Local Access
-    openLocalBtn: 'Buka Lokal',
-    openLocalTitle: 'Buka Aplikasi di Browser',
+    openLocalBtn: 'Buka',
+    openLocalTitle: 'Buka Aplikasi',
     detectedPortLabel: 'Terdeteksi',
   },
   en: {
@@ -362,8 +362,8 @@ export const translations = {
     noRuntimeLogsYet: 'No runtime logs recorded yet...',
 
     // Fase 9 Port & Local Access
-    openLocalBtn: 'Open Local',
-    openLocalTitle: 'Open App in Browser',
+    openLocalBtn: 'Open',
+    openLocalTitle: 'Open Application',
     detectedPortLabel: 'Detected',
   },
 } as const;
