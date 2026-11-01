@@ -161,3 +161,13 @@ pub struct BuildLogEvent {
     pub line: String,
     pub stream: String, // "stdout" | "stderr"
 }
+
+/// Realtime runtime log event dari PM2 (PRD Bagian 10 & 13 Fase 8)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuntimeLogEvent {
+    pub project_id: i64,
+    pub project_name: String,
+    pub line: String,
+    pub stream: String, // "stdout" | "stderr"
+    pub timestamp: u64,
+}

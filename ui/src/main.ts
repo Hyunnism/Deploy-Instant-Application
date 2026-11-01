@@ -29,18 +29,22 @@ import {
   savePat,
   setSetting,
   startProject,
+  startRuntimeLogs,
   startSetup,
   stopAllProcesses,
   stopProject,
+  stopRuntimeLogs,
+  onRuntimeLog,
   updateProject,
   verifySetup,
   type BuildLogEvent,
   type GitLogEvent,
   type Pm2Status,
   type Project,
+  type RuntimeLogEvent,
 } from './api';
 import { translations, type TranslationKey } from './i18n';
-import { defaultFormData, state, type FormEnvVar } from './state';
+import { defaultFormData, state, type FormEnvVar, type RuntimeLogItem } from './state';
 
 const appEl = document.getElementById('app')!;
 
@@ -210,6 +214,151 @@ function updateBuildModalStatus(subtitleText: string, isBuilding: boolean, error
 }
 
 // -------------------------------------------------------------
+// FASE 8: RUNTIME LOG TERMINAL STREAMING HELPERS
+// -------------------------------------------------------------
+function formatLogTime(ts: number): string {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toTimeString().split(' ')[0] || '';
+}
+
+function appendRuntimeLogLine(event: RuntimeLogEvent) {
+  // Batas buffer in-memory 2.000 baris sesuai PRD Fase 8
+  if (state.runtimeLogsModal.logs.length >= 2000) {
+    state.runtimeLogsModal.logs.shift();
+  }
+
+  const item: RuntimeLogItem = {
+    projectId: event.project_id,
+    projectName: event.project_name,
+    line: event.line,
+    stream: event.stream,
+    timestamp: event.timestamp,
+  };
+  state.runtimeLogsModal.logs.push(item);
+
+  // Jika sedang dijeda, jangan update visual DOM
+  if (state.runtimeLogsModal.isPaused) return;
+
+  // Filter cek
+  const curFilter = state.runtimeLogsModal.filter;
+  if (curFilter !== 'all' && curFilter !== event.stream) return;
+
+  const container = document.getElementById('runtime-logs-content');
+  if (container) {
+    const placeholder = container.querySelector('.log-line.muted');
+    if (placeholder) placeholder.remove();
+
+    if (container.children.length >= 2000) {
+      container.removeChild(container.firstElementChild!);
+    }
+
+    const isErr = event.stream === 'stderr';
+    const timeFormatted = formatLogTime(event.timestamp);
+
+    const div = document.createElement('div');
+    div.className = `log-line ${isErr ? 'log-stderr' : 'log-stdout'}`;
+    div.innerHTML = `
+      <span class="log-time">${escapeHtml(timeFormatted)}</span>
+      <span class="log-badge ${isErr ? 'err' : 'out'}">${isErr ? 'ERR' : 'OUT'}</span>
+      <span class="log-text">${escapeHtml(event.line)}</span>
+    `;
+    container.appendChild(div);
+
+    if (state.runtimeLogsModal.autoScroll) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
+}
+
+function getRuntimeLogsHtml(): string {
+  const modal = state.runtimeLogsModal;
+  const curFilter = modal.filter;
+  const filtered = modal.logs.filter((item) => {
+    if (curFilter === 'all') return true;
+    return item.stream === curFilter;
+  });
+
+  if (filtered.length === 0) {
+    return `<div class="log-line muted">${t('noRuntimeLogsYet')}</div>`;
+  }
+
+  return filtered
+    .map((item) => {
+      const isErr = item.stream === 'stderr';
+      const timeFormatted = formatLogTime(item.timestamp);
+      return `
+        <div class="log-line ${isErr ? 'log-stderr' : 'log-stdout'}">
+          <span class="log-time">${escapeHtml(timeFormatted)}</span>
+          <span class="log-badge ${isErr ? 'err' : 'out'}">${isErr ? 'ERR' : 'OUT'}</span>
+          <span class="log-text">${escapeHtml(item.line)}</span>
+        </div>
+      `;
+    })
+    .join('');
+}
+
+function renderRuntimeLogsLines() {
+  const container = document.getElementById('runtime-logs-content');
+  if (!container) return;
+  container.innerHTML = getRuntimeLogsHtml();
+
+  if (state.runtimeLogsModal.autoScroll) {
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+async function openRuntimeLogsModal(projectId: number) {
+  const p = state.projects.find((proj) => proj.id === projectId);
+  if (!p) return;
+
+  // Tutup stream sebelumnya jika ada
+  if (state.runtimeLogsModal.isOpen && state.runtimeLogsModal.projectId) {
+    await closeRuntimeLogsModal();
+  }
+
+  state.openProjectMenuId = null;
+  state.runtimeLogsModal = {
+    isOpen: true,
+    projectId: projectId,
+    projectName: p.name,
+    isStreaming: true,
+    isPaused: false,
+    filter: 'all',
+    autoScroll: true,
+    logs: [],
+    unlistenFn: null,
+  };
+
+  render();
+  renderRuntimeLogsLines();
+
+  try {
+    await startRuntimeLogs(projectId);
+  } catch (err) {
+    console.error('Failed to start runtime logs:', err);
+  }
+}
+
+async function closeRuntimeLogsModal() {
+  if (!state.runtimeLogsModal.isOpen) return;
+
+  const pid = state.runtimeLogsModal.projectId;
+  state.runtimeLogsModal.isOpen = false;
+  state.runtimeLogsModal.isStreaming = false;
+  state.runtimeLogsModal.projectId = null;
+  render();
+
+  if (pid) {
+    try {
+      await stopRuntimeLogs(pid);
+    } catch (err) {
+      console.error('Failed to stop runtime logs:', err);
+    }
+  }
+}
+
+// -------------------------------------------------------------
 // RENDER CONTROLLER
 // -------------------------------------------------------------
 function render() {
@@ -248,10 +397,18 @@ function render() {
       ${renderGitLogModal()}
       ${renderBuildModal()}
       ${renderDotenvModal()}
+      ${renderRuntimeLogsModal()}
     </div>
   `;
 
   attachEventListeners();
+
+  if (state.runtimeLogsModal.isOpen && state.runtimeLogsModal.autoScroll) {
+    const container = document.getElementById('runtime-logs-content');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }
 }
 
 // -------------------------------------------------------------
@@ -362,6 +519,14 @@ function renderProjectCard(p: Project): string {
             </button>
             ${isMenuOpen ? `
               <div class="project-dropdown-menu">
+                <button class="dropdown-item btn-view-runtime-log" data-id="${p.id}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 17 10 11 4 5"></polyline>
+                    <line x1="12" y1="19" x2="20" y2="19"></line>
+                  </svg>
+                  <span>${t('viewRuntimeLogsBtn')}</span>
+                </button>
+                <div class="dropdown-divider"></div>
                 <button class="dropdown-item btn-edit-project" data-id="${p.id}">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -446,7 +611,7 @@ function renderProjectCard(p: Project): string {
       )
     }
         ${pm2?.status === 'online'
-          ? `<span class="meta-badge status-online">
+          ? `<span class="meta-badge status-online btn-open-runtime-log-badge" data-id="${p.id}" style="cursor: pointer;" title="${t('viewRuntimeLogsBtn')}">
                <span class="meta-dot pulse-online"></span>
                ${t('statusOnline')}
              </span>`
@@ -893,6 +1058,85 @@ function renderDotenvModal(): string {
         <div class="modal-footer">
           <button class="modal-btn cancel" id="btn-cancel-dotenv-modal">${t('modalCancel')}</button>
           <button class="modal-btn primary" id="btn-process-dotenv">${t('envImportProcessBtn')}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FASE 8: RUNTIME LOG TERMINAL MODAL
+// -------------------------------------------------------------
+function renderRuntimeLogsModal(): string {
+  const modal = state.runtimeLogsModal;
+  if (!modal.isOpen) return '';
+
+  const pm2 = modal.projectId ? state.pm2Statuses[modal.projectName] : undefined;
+  const isOnline = pm2?.status === 'online';
+
+  return `
+    <div class="modal-overlay" id="runtime-logs-modal-overlay">
+      <div class="modal-sheet runtime-logs-sheet">
+        <div class="sheet-handle-bar"></div>
+        <div class="modal-header">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 class="modal-title">${t('runtimeLogsModalTitle')}</h3>
+              <span class="meta-badge ${isOnline ? 'status-online' : 'status-stopped'}" style="margin: 0;">
+                <span class="meta-dot ${isOnline ? 'pulse-online' : ''}"></span>
+                ${isOnline ? t('statusOnline') : t('statusStopped')}
+              </span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+              ${escapeHtml(modal.projectName)} • ${t('runtimeLogsSubtitle')}
+            </div>
+          </div>
+          <button class="modal-close-btn" id="btn-close-runtime-logs-modal">${t('modalClose')}</button>
+        </div>
+
+        <div class="modal-body" style="padding-top: 6px;">
+          <!-- Toolbar (Filter Stream & Controls) -->
+          <div class="runtime-toolbar">
+            <div class="runtime-filter-group">
+              <button class="runtime-filter-btn ${modal.filter === 'all' ? 'active' : ''}" data-filter="all">
+                ${t('filterAll')}
+              </button>
+              <button class="runtime-filter-btn ${modal.filter === 'stdout' ? 'active' : ''}" data-filter="stdout">
+                ${t('filterStdout')}
+              </button>
+              <button class="runtime-filter-btn ${modal.filter === 'stderr' ? 'active' : ''}" data-filter="stderr">
+                ${t('filterStderr')}
+              </button>
+            </div>
+
+            <div class="runtime-controls-group">
+              <button class="runtime-ctrl-btn ${modal.isPaused ? 'warning' : ''}" id="btn-toggle-pause-logs" title="${modal.isPaused ? t('resumeLogsBtn') : t('pauseLogsBtn')}">
+                ${modal.isPaused ? `▶ ${t('resumeLogsBtn')}` : `⏸ ${t('pauseLogsBtn')}`}
+              </button>
+              <button class="runtime-ctrl-btn ${modal.autoScroll ? 'active' : ''}" id="btn-toggle-autoscroll" title="${t('autoScrollLabel')}">
+                ⬇ ${t('autoScrollLabel')}
+              </button>
+              <button class="runtime-ctrl-btn" id="btn-copy-runtime-logs" title="${t('copyLogsBtn')}">
+                📋 ${t('copyLogsBtn')}
+              </button>
+              <button class="runtime-ctrl-btn danger" id="btn-clear-runtime-logs" title="${t('clearLogsBtn')}">
+                🗑
+              </button>
+            </div>
+          </div>
+
+          <!-- Terminal Box -->
+          <div class="engine-logs-section" style="margin-top: 4px;">
+            <div class="engine-logs-box runtime-terminal-box" id="runtime-logs-content">
+              ${getRuntimeLogsHtml()}
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn primary" id="btn-footer-close-runtime-logs-modal" style="width: 100%;">
+            ${t('modalClose')}
+          </button>
         </div>
       </div>
     </div>
@@ -1663,6 +1907,106 @@ function attachEventListeners() {
     }
   });
 
+  // -------------------------------------------------------------
+  // FASE 8: RUNTIME LOG MODAL EVENT HANDLERS
+  // -------------------------------------------------------------
+  document.querySelectorAll('.btn-view-runtime-log').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      await openRuntimeLogsModal(id);
+    });
+  });
+
+  document.querySelectorAll('.btn-open-runtime-log-badge').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      await openRuntimeLogsModal(id);
+    });
+  });
+
+  document.getElementById('btn-close-runtime-logs-modal')?.addEventListener('click', closeRuntimeLogsModal);
+  document.getElementById('btn-footer-close-runtime-logs-modal')?.addEventListener('click', closeRuntimeLogsModal);
+  document.getElementById('runtime-logs-modal-overlay')?.addEventListener('click', (e) => {
+    if ((e.target as HTMLElement).id === 'runtime-logs-modal-overlay') {
+      closeRuntimeLogsModal();
+    }
+  });
+
+  // Filter Stream: Semua | Stdout | Stderr
+  document.querySelectorAll('.runtime-filter-btn').forEach((el) => {
+    el.addEventListener('click', () => {
+      const filter = el.getAttribute('data-filter') as 'all' | 'stdout' | 'stderr';
+      state.runtimeLogsModal.filter = filter;
+      document.querySelectorAll('.runtime-filter-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-filter') === filter);
+      });
+      renderRuntimeLogsLines();
+    });
+  });
+
+  // Toggle Pause / Resume
+  document.getElementById('btn-toggle-pause-logs')?.addEventListener('click', () => {
+    state.runtimeLogsModal.isPaused = !state.runtimeLogsModal.isPaused;
+    const isPaused = state.runtimeLogsModal.isPaused;
+    const btn = document.getElementById('btn-toggle-pause-logs');
+    if (btn) {
+      btn.innerHTML = isPaused ? `▶ ${t('resumeLogsBtn')}` : `⏸ ${t('pauseLogsBtn')}`;
+      btn.classList.toggle('warning', isPaused);
+      btn.title = isPaused ? t('resumeLogsBtn') : t('pauseLogsBtn');
+    }
+    if (!isPaused) {
+      renderRuntimeLogsLines();
+    }
+  });
+
+  // Toggle Auto-scroll
+  document.getElementById('btn-toggle-autoscroll')?.addEventListener('click', () => {
+    state.runtimeLogsModal.autoScroll = !state.runtimeLogsModal.autoScroll;
+    const autoScroll = state.runtimeLogsModal.autoScroll;
+    const btn = document.getElementById('btn-toggle-autoscroll');
+    if (btn) {
+      btn.classList.toggle('active', autoScroll);
+    }
+    if (autoScroll) {
+      const container = document.getElementById('runtime-logs-content');
+      if (container) container.scrollTop = container.scrollHeight;
+    }
+  });
+
+  // Copy Runtime Logs
+  document.getElementById('btn-copy-runtime-logs')?.addEventListener('click', async () => {
+    const curFilter = state.runtimeLogsModal.filter;
+    const filtered = state.runtimeLogsModal.logs.filter((item) => {
+      if (curFilter === 'all') return true;
+      return item.stream === curFilter;
+    });
+    const text = filtered
+      .map((item) => `[${item.timestamp}] [${item.stream.toUpperCase()}] ${item.line}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const btn = document.getElementById('btn-copy-runtime-logs');
+      if (btn) btn.innerHTML = `✓ ${t('logsCopied')}`;
+      setTimeout(() => {
+        if (btn) btn.innerHTML = `📋 ${t('copyLogsBtn')}`;
+      }, 1500);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  // Clear Runtime Logs
+  document.getElementById('btn-clear-runtime-logs')?.addEventListener('click', () => {
+    state.runtimeLogsModal.logs = [];
+    const container = document.getElementById('runtime-logs-content');
+    if (container) {
+      container.innerHTML = `<div class="log-line muted">${t('noRuntimeLogsYet')}</div>`;
+    }
+  });
+
   // Klik Badge Build untuk membuka Log Viewer
   document.querySelectorAll('.btn-view-build-log').forEach((el) => {
     el.addEventListener('click', async () => {
@@ -2206,6 +2550,17 @@ async function init() {
     });
   } catch (e) {
     console.error('Failed to register build:log listener:', e);
+  }
+
+  // Listen to Runtime streaming logs (Fase 8)
+  try {
+    await onRuntimeLog((ev: RuntimeLogEvent) => {
+      if (state.runtimeLogsModal.isOpen && state.runtimeLogsModal.projectId === ev.project_id) {
+        appendRuntimeLogLine(ev);
+      }
+    });
+  } catch (e) {
+    console.error('Failed to register runtime:log listener:', e);
   }
 
   // Load language setting

@@ -131,6 +131,27 @@ export interface AppState {
   pm2Loading: Record<string, boolean>;
   isStopAllLoading: boolean;
   openProjectMenuId: number | null;
+
+  // Fase 8 PM2 Runtime Logs State
+  runtimeLogsModal: {
+    isOpen: boolean;
+    projectId: number | null;
+    projectName: string;
+    isStreaming: boolean;
+    logs: RuntimeLogItem[];
+    filter: 'all' | 'stdout' | 'stderr';
+    isPaused: boolean;
+    autoScroll: boolean;
+    unlistenFn: (() => void) | null;
+  };
+}
+
+export interface RuntimeLogItem {
+  projectId: number;
+  projectName: string;
+  line: string;
+  stream: 'stdout' | 'stderr';
+  timestamp: number;
 }
 
 export const defaultFormData: ProjectFormData = {
@@ -225,4 +246,17 @@ export const state: AppState = {
   pm2Loading: {},
   isStopAllLoading: false,
   openProjectMenuId: null,
+
+  // Fase 8
+  runtimeLogsModal: {
+    isOpen: false,
+    projectId: null,
+    projectName: '',
+    isStreaming: false,
+    logs: [],
+    filter: 'all',
+    isPaused: false,
+    autoScroll: true,
+    unlistenFn: null,
+  },
 };

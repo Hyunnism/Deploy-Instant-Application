@@ -725,18 +725,18 @@ deploy-instant/
 **Fokus:** hanya log runtime PM2.
 
 **Checklist Kode**
-- [ ] Streaming `pm2 logs <name> --raw --lines 200` ke UI via event.
-- [ ] Filter stdout/stderr, jeda/lanjut, auto-scroll, salin, bersihkan tampilan.
-- [ ] Batas buffer UI; rotasi file log PM2 (`pm2-logrotate` atau `--max-size`).
-- [ ] Proses `pm2 logs` dihentikan saat layar ditutup.
+- [x] Streaming `pm2 logs <name> --raw --lines 200` ke UI via event.
+- [x] Filter stdout/stderr, jeda/lanjut, auto-scroll, salin, bersihkan tampilan.
+- [x] Batas buffer UI; rotasi file log PM2 (`pm2-logrotate` atau `--max-size`).
+- [x] Proses `pm2 logs` dihentikan saat layar ditutup.
 
 **Checklist Pengujian**
-- [ ] Output `console.log` dan `console.error` muncul dalam < 1 dtk.
-- [ ] Log besar (10.000 baris cepat): UI tidak membeku.
-- [ ] Keluar dari layar log: proses `pm2 logs` mati.
-- [ ] Rotasi log menjaga penggunaan disk terkendali.
+- [x] Output `console.log` dan `console.error` muncul dalam < 1 dtk.
+- [x] Log besar (10.000 baris cepat): UI tidak membeku.
+- [x] Keluar dari layar log: proses `pm2 logs` mati.
+- [x] Rotasi log menjaga penggunaan disk terkendali.
 
-**Kriteria selesai:** log runtime realtime, stabil, dan tidak bocor proses.
+**Kriteria selesai:** log runtime realtime, stabil, dan tidak bocor proses. *(Lulus verifikasi live di HP fisik Redmi Note 8: streaming event `runtime:log` realtime < 1 dtk untuk stdout dan stderr, modal viewer via badge ● Online dan menu ⋮ titik 3, kontrol Jeda/Lanjut/Auto-scroll/Salin/Bersihkan, buffer aman 2.000 baris, zero orphan process dipastikan lewat pembunuhan grup proses saat modal ditutup)*.
 
 ---
 

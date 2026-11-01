@@ -4,11 +4,23 @@
 use crate::core::exec::proot_exec;
 use crate::core::port::resolve_project_port;
 use crate::error::{AppError, Result};
-use crate::models::{EnvVarItem, Pm2Status, Project};
+use crate::models::{EnvVarItem, Pm2Status, Project, RuntimeLogEvent};
 use serde::Deserialize;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::Emitter;
+use tokio::sync::Mutex;
+
+pub const RUNTIME_LOG_EVENT: &str = "runtime:log";
+
+pub type ActiveLogStreamManager = Arc<Mutex<HashMap<i64, tokio::sync::oneshot::Sender<()>>>>;
+
+pub fn create_log_stream_manager() -> ActiveLogStreamManager {
+    Arc::new(Mutex::new(HashMap::new()))
+}
 
 static DAEMON_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
@@ -576,6 +588,176 @@ pub async fn stop_all_processes(
     );
 
     let _ = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await;
+    Ok(())
+}
+
+/// Memulai streaming realtime runtime log PM2 (`pm2 logs <name> --raw --lines 200`) ke UI
+#[allow(clippy::too_many_arguments)]
+pub async fn start_runtime_log_stream(
+    app: tauri::AppHandle,
+    project_id: i64,
+    project_name: String,
+    stream_manager: ActiveLogStreamManager,
+    proot_bin: &Path,
+    rootfs_dir: &Path,
+    tmp_dir: &Path,
+    no_seccomp: bool,
+) -> Result<()> {
+    // 1. Hentikan streaming sebelumnya untuk project ini jika masih ada
+    stop_runtime_log_stream(project_id, &stream_manager).await;
+
+    // 2. Siapkan sinyal pembatalan (oneshot channel)
+    let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    {
+        let mut mgr = stream_manager.lock().await;
+        mgr.insert(project_id, cancel_tx);
+    }
+
+    // 3. Pastikan daemon PM2 aktif
+    ensure_pm2_daemon_running(proot_bin, rootfs_dir, tmp_dir, no_seccomp).await?;
+
+    // 4. Siapkan proot command untuk `pm2 logs <name> --raw --lines 200`
+    let log_cmd = format!("pm2 logs '{}' --raw --lines 200", project_name);
+    let mut cmd = proot_exec(
+        proot_bin,
+        rootfs_dir,
+        tmp_dir,
+        "/",
+        &log_cmd,
+        &[],
+        no_seccomp,
+        true, // kill_on_exit aktif agar child group langsung terbunuh
+    );
+
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+    #[cfg(unix)]
+    cmd.process_group(0);
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            let mut mgr = stream_manager.lock().await;
+            mgr.remove(&project_id);
+            return Err(AppError::Internal(format!("Gagal spawn pm2 logs: {e}")));
+        }
+    };
+
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+
+    let app_clone = app.clone();
+    let p_name = project_name.clone();
+    let mgr_clone = stream_manager.clone();
+
+    // 5. Spawn background task untuk membaca stream dan menangani pembatalan bersih
+    tokio::spawn(async move {
+        use tokio::io::{AsyncBufReadExt, BufReader};
+
+        let stdout_task = {
+            let app = app_clone.clone();
+            let p_name = p_name.clone();
+            async move {
+                if let Some(out) = stdout {
+                    let mut reader = BufReader::new(out).lines();
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let _ = app.emit(
+                            RUNTIME_LOG_EVENT,
+                            RuntimeLogEvent {
+                                project_id,
+                                project_name: p_name.clone(),
+                                line,
+                                stream: "stdout".into(),
+                                timestamp: now_ms,
+                            },
+                        );
+                    }
+                }
+            }
+        };
+
+        let stderr_task = {
+            let app = app_clone.clone();
+            let p_name = p_name.clone();
+            async move {
+                if let Some(err) = stderr {
+                    let mut reader = BufReader::new(err).lines();
+                    while let Ok(Some(line)) = reader.next_line().await {
+                        let now_ms = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let _ = app.emit(
+                            RUNTIME_LOG_EVENT,
+                            RuntimeLogEvent {
+                                project_id,
+                                project_name: p_name.clone(),
+                                line,
+                                stream: "stderr".into(),
+                                timestamp: now_ms,
+                            },
+                        );
+                    }
+                }
+            }
+        };
+
+        tokio::select! {
+            _ = async {
+                tokio::join!(stdout_task, stderr_task);
+            } => {},
+            _ = &mut cancel_rx => {
+                // UI meminta menghentikan streaming (layar ditutup)
+            }
+        }
+
+        // Hentikan seluruh process group seketika (zero orphan process)
+        #[cfg(unix)]
+        if let Some(pid) = child.id() {
+            unsafe {
+                libc::kill(-(pid as libc::pid_t), libc::SIGKILL);
+            }
+        }
+        let _ = child.kill().await;
+
+        let mut mgr = mgr_clone.lock().await;
+        mgr.remove(&project_id);
+    });
+
+    Ok(())
+}
+
+/// Menghentikan streaming runtime log PM2 untuk project tertentu
+pub async fn stop_runtime_log_stream(project_id: i64, stream_manager: &ActiveLogStreamManager) {
+    let mut mgr = stream_manager.lock().await;
+    if let Some(sender) = mgr.remove(&project_id) {
+        let _ = sender.send(());
+    }
+}
+
+/// Mengatur konfigurasi rotasi log PM2 agar penggunaan disk terkendali
+pub async fn configure_pm2_log_rotation(
+    proot_bin: &Path,
+    rootfs_dir: &Path,
+    tmp_dir: &Path,
+    no_seccomp: bool,
+) -> Result<()> {
+    ensure_pm2_daemon_running(proot_bin, rootfs_dir, tmp_dir, no_seccomp).await?;
+    let mut cmd = proot_exec(
+        proot_bin,
+        rootfs_dir,
+        tmp_dir,
+        "/",
+        "pm2 set pm2:log_max_size 10M && pm2 set pm2:retain 3",
+        &[],
+        no_seccomp,
+        false,
+    );
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output()).await;
     Ok(())
 }
 

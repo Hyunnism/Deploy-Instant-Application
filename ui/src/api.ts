@@ -305,6 +305,28 @@ export async function checkAutoStart(): Promise<Pm2Status[]> {
   return await invoke<Pm2Status[]>('pm2_check_autostart');
 }
 
+export interface RuntimeLogEvent {
+  project_id: number;
+  project_name: string;
+  line: string;
+  stream: 'stdout' | 'stderr';
+  timestamp: number;
+}
+
+export async function startRuntimeLogs(projectId: number): Promise<void> {
+  return await invoke<void>('runtime_logs_start', { projectId });
+}
+
+export async function stopRuntimeLogs(projectId: number): Promise<void> {
+  return await invoke<void>('runtime_logs_stop', { projectId });
+}
+
+export async function onRuntimeLog(
+  callback: (event: RuntimeLogEvent) => void
+): Promise<UnlistenFn> {
+  return await listen<RuntimeLogEvent>('runtime:log', (e) => callback(e.payload));
+}
+
 
 
 

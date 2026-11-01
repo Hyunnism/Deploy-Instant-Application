@@ -166,6 +166,19 @@ export const translations = {
     metricUptime: 'Uptime',
     metricRestarts: 'Restart',
     detectedPort: 'Port',
+
+    // Fase 8 Runtime Logs
+    runtimeLogsModalTitle: 'Log Runtime PM2',
+    runtimeLogsSubtitle: 'Streaming stdout & stderr realtime dari background proot',
+    viewRuntimeLogsBtn: 'Lihat Log Runtime',
+    filterAll: 'Semua',
+    filterStdout: 'Stdout',
+    filterStderr: 'Stderr',
+    pauseLogsBtn: 'Jeda',
+    resumeLogsBtn: 'Lanjut',
+    autoScrollLabel: 'Auto-scroll',
+    clearLogsBtn: 'Bersihkan',
+    noRuntimeLogsYet: 'Belum ada log runtime yang tercatat...',
   },
   en: {
     appName: 'Deploy Instant',
@@ -329,6 +342,19 @@ export const translations = {
     metricUptime: 'Uptime',
     metricRestarts: 'Restart',
     detectedPort: 'Port',
+
+    // Fase 8 Runtime Logs
+    runtimeLogsModalTitle: 'PM2 Runtime Logs',
+    runtimeLogsSubtitle: 'Realtime stdout & stderr streaming from proot background',
+    viewRuntimeLogsBtn: 'View Runtime Logs',
+    filterAll: 'All',
+    filterStdout: 'Stdout',
+    filterStderr: 'Stderr',
+    pauseLogsBtn: 'Pause',
+    resumeLogsBtn: 'Resume',
+    autoScrollLabel: 'Auto-scroll',
+    clearLogsBtn: 'Clear',
+    noRuntimeLogsYet: 'No runtime logs recorded yet...',
   },
 } as const;
 

@@ -21,6 +21,7 @@ pub fn run() {
             })?;
             app.manage(db);
             app.manage(core::project::ActiveBuildManager::new());
+            app.manage(core::pm2::create_log_stream_manager());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -58,6 +59,8 @@ pub fn run() {
             commands::pm2::pm2_list,
             commands::pm2::pm2_stop_all,
             commands::pm2::pm2_check_autostart,
+            commands::pm2::runtime_logs_start,
+            commands::pm2::runtime_logs_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

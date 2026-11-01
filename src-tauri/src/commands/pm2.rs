@@ -164,3 +164,32 @@ pub async fn pm2_check_autostart(app: AppHandle) -> Result<Vec<Pm2Status>, Strin
 
     Ok(started)
 }
+
+#[tauri::command]
+pub async fn runtime_logs_start(app: AppHandle, project_id: i64) -> Result<(), String> {
+    let db = app.state::<Database>();
+    let project = db.get_project(project_id).map_err(|e| e.to_string())?;
+
+    let stream_mgr = app.state::<pm2::ActiveLogStreamManager>();
+    let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
+
+    pm2::start_runtime_log_stream(
+        app.clone(),
+        project.id,
+        project.name,
+        stream_mgr.inner().clone(),
+        &proot_bin,
+        &rootfs_dir,
+        &tmp_dir,
+        false,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn runtime_logs_stop(app: AppHandle, project_id: i64) -> Result<(), String> {
+    let stream_mgr = app.state::<pm2::ActiveLogStreamManager>();
+    pm2::stop_runtime_log_stream(project_id, stream_mgr.inner()).await;
+    Ok(())
+}
