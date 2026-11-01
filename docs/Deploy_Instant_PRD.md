@@ -702,22 +702,22 @@ deploy-instant/
 **Fokus:** deploy, kontrol, dan status. Belum ada log runtime dan tunnel.
 
 **Checklist Kode**
-- [ ] `pm2.rs`: `start` (nama = nama project, `NODE_ENV=production`, `--max-restarts 5`), `stop`, `restart`, `delete`.
-- [ ] Dukungan `ecosystem.config.js` bila ada di repo (jika ada, dipakai sebagai gantinya).
-- [ ] `pm2 jlist` di-parse (`serde_json`): status, pid, uptime, restart, CPU, memori.
-- [ ] Polling adaptif (2 dtk di detail, 5 dtk di dashboard, 0 di latar belakang).
-- [ ] UI: badge status, kartu Ringkasan, tombol Start/Stop/Restart.
-- [ ] Deploy hanya aktif jika build terakhir lulus.
-- [ ] State machine (8.5) diterapkan.
+- [x] `pm2.rs`: `start` (nama = nama project, `NODE_ENV=production`, `--max-restarts 5`), `stop`, `restart`, `delete`.
+- [x] Dukungan `ecosystem.config.js` bila ada di repo (jika ada, dipakai sebagai gantinya).
+- [x] `pm2 jlist` di-parse (`serde_json`): status, pid, uptime, restart, CPU, memori.
+- [x] Polling adaptif (2 dtk di detail, 5 dtk di dashboard, 0 di latar belakang).
+- [x] UI: badge status, kartu Ringkasan, tombol Start/Stop/Restart.
+- [x] Deploy hanya aktif jika build terakhir lulus.
+- [x] State machine (8.5) diterapkan.
 
 **Checklist Pengujian**
-- [ ] Deploy Express: status online dan terlihat di `pm2 jlist`.
-- [ ] Proses di-kill manual: PM2 me-restart; setelah 5 kali, status errored.
-- [ ] Stop/Restart/Delete berfungsi.
-- [ ] Project dengan `ecosystem.config.js` dijalankan benar.
-- [ ] Polling berhenti saat app di latar belakang (diverifikasi lewat log).
+- [x] Deploy Express: status online dan terlihat di `pm2 jlist`.
+- [x] Proses di-kill manual: PM2 me-restart; setelah 5 kali, status errored.
+- [x] Stop/Restart/Delete berfungsi.
+- [x] Project dengan `ecosystem.config.js` dijalankan benar.
+- [x] Polling berhenti saat app di latar belakang (diverifikasi lewat log).
 
-**Kriteria selesai:** project dapat dideploy dan dikontrol, dan statusnya akurat.
+**Kriteria selesai:** project dapat dideploy dan dikontrol, dan statusnya akurat. *(Lulus verifikasi live di HP fisik Redmi Note 8 Android 11: PM2 7.1.1 online via persistent proot supervisor Opsi A, port dinamis 3001/3002 merespons HTTP 200 OK, metrik CPU/RAM/Uptime/Restart real-time, kebab menu ⋮ titik 3 untuk Ubah/Hapus, tombol Stop Semua berfungsi)*.
 
 ---
 

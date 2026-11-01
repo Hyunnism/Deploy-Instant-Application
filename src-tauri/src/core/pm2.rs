@@ -10,6 +10,136 @@ use serde_json::Value;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+static DAEMON_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Memastikan PM2 daemon aktif di dalam proot (Opsi A: persistent proot supervisor)
+pub async fn ensure_pm2_daemon_running(
+    proot_bin: &Path,
+    rootfs_dir: &Path,
+    tmp_dir: &Path,
+    no_seccomp: bool,
+) -> Result<()> {
+    let _guard = DAEMON_LOCK.lock().await;
+
+    let pm2_dir = rootfs_dir.join("root").join(".pm2");
+    let rpc_sock = pm2_dir.join("rpc.sock");
+
+    // 1. Jika rpc socket sudah ada, verifikasi responsivitasnya via `pm2 ping`
+    if rpc_sock.exists() {
+        let mut check_cmd = proot_exec(
+            proot_bin,
+            rootfs_dir,
+            tmp_dir,
+            "/",
+            "pm2 ping",
+            &[],
+            no_seccomp,
+            false,
+        );
+
+        if let Ok(Ok(output)) =
+            tokio::time::timeout(std::time::Duration::from_secs(2), check_cmd.output()).await
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stdout.contains("pong") || stderr.contains("pong") {
+                return Ok(());
+            }
+        }
+
+        // Socket ada tapi tidak merespons, hapus socket lama
+        let _ = std::fs::remove_file(&rpc_sock);
+        let _ = std::fs::remove_file(pm2_dir.join("pub.sock"));
+    }
+
+    // 2. Buat direktori logs & pids
+    let pm2_logs = pm2_dir.join("logs");
+    let pm2_pids = pm2_dir.join("pids");
+    let _ = std::fs::create_dir_all(&pm2_logs);
+    let _ = std::fs::create_dir_all(&pm2_pids);
+
+    // 3. Spawn Daemon.js di dalam proot sebagai persistent background supervisor
+    let shell_cmd = "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH; export HOME=/root; export LANG=C.UTF-8; mkdir -p /root/.pm2/logs /root/.pm2/pids && node /usr/local/lib/node_modules/pm2/lib/Daemon.js";
+    let tmp_bind = format!("{}:/tmp", tmp_dir.to_str().unwrap_or("/tmp"));
+
+    let mut std_cmd = std::process::Command::new(proot_bin);
+    std_cmd.args([
+        "-0",
+        "-r",
+        rootfs_dir.to_str().unwrap_or("/"),
+        "-b",
+        "/dev",
+        "-b",
+        "/proc",
+        "-b",
+        "/sys",
+        "-b",
+        &tmp_bind,
+        "-w",
+        "/",
+        "/bin/sh",
+        "-c",
+        shell_cmd,
+    ]);
+    std_cmd.env("PROOT_TMP_DIR", tmp_dir);
+    std_cmd.env("HOME", "/root");
+    std_cmd.env("LANG", "C.UTF-8");
+    std_cmd.env(
+        "PATH",
+        "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    );
+    if no_seccomp {
+        std_cmd.env("PROOT_NO_SECCOMP", "1");
+    }
+    std_cmd.stdin(std::process::Stdio::null());
+    std_cmd.stdout(std::process::Stdio::null());
+    std_cmd.stderr(std::process::Stdio::null());
+
+    match std_cmd.spawn() {
+        Ok(child) => {
+            // Biarkan proses supervisor proot hidup terus di background tanpa di-kill saat handle drop
+            std::mem::forget(child);
+        }
+        Err(e) => {
+            return Err(AppError::Internal(format!(
+                "Gagal men-spawn PM2 Daemon: {e}"
+            )));
+        }
+    }
+
+    // 4. Polling hingga PM2 ping mengembalikan 'pong' (maks 4 detik)
+    for _ in 0..16 {
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        let mut ping = proot_exec(
+            proot_bin,
+            rootfs_dir,
+            tmp_dir,
+            "/",
+            "pm2 ping",
+            &[],
+            no_seccomp,
+            false,
+        );
+        if let Ok(Ok(output)) =
+            tokio::time::timeout(std::time::Duration::from_millis(1500), ping.output()).await
+        {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stdout.contains("pong") || stderr.contains("pong") {
+                return Ok(());
+            }
+        }
+    }
+
+    if rpc_sock.exists() {
+        return Ok(());
+    }
+
+    Err(AppError::Internal(
+        "Timeout menunggu PM2 daemon aktif".into(),
+    ))
+}
+
 /// Mengambil daftar seluruh proses PM2 beserta metrik runtime
 pub async fn list_processes(
     proot_bin: &Path,
@@ -17,6 +147,11 @@ pub async fn list_processes(
     tmp_dir: &Path,
     no_seccomp: bool,
 ) -> Result<Vec<Pm2Status>> {
+    let rpc_sock = rootfs_dir.join("root").join(".pm2").join("rpc.sock");
+    if !rpc_sock.exists() {
+        return Ok(vec![]);
+    }
+
     let mut cmd = proot_exec(
         proot_bin,
         rootfs_dir,
@@ -142,7 +277,10 @@ pub async fn start_project(
         ));
     }
 
-    // 2. Resolusi target port dan validasi bentrok (PRD Bagian 8.7)
+    // 2. Pastikan PM2 daemon aktif (Opsi A)
+    ensure_pm2_daemon_running(proot_bin, rootfs_dir, tmp_dir, no_seccomp).await?;
+
+    // 3. Resolusi target port dan validasi bentrok (PRD Bagian 8.7)
     let (target_port, should_inject_port) =
         resolve_project_port(project, env_vars, active_projects)?;
 
@@ -154,7 +292,10 @@ pub async fn start_project(
         )));
     }
 
-    // 3. Cek dukungan ecosystem.config.js / ecosystem.config.cjs (PRD Bagian 13 Fase 7)
+    // Bersihkan proses lama dengan nama sama jika ada agar start selalu bersih
+    let _ = delete_process(&project.name, proot_bin, rootfs_dir, tmp_dir, no_seccomp).await;
+
+    // 4. Cek dukungan ecosystem.config.js / ecosystem.config.cjs (PRD Bagian 13 Fase 7)
     let ecosystem_js = app_dir.join("ecosystem.config.js");
     let ecosystem_cjs = app_dir.join("ecosystem.config.cjs");
 
@@ -178,22 +319,34 @@ pub async fn start_project(
                     script, project.name
                 )
             } else {
+                let runner_path = app_dir.join(".deploy_start.sh");
+                let runner_content = format!("#!/bin/sh\nexec {}\n", trimmed_start);
+                let _ = std::fs::write(&runner_path, runner_content);
                 format!(
-                    "pm2 start '{}' --name '{}' --max-restarts 5",
-                    trimmed_start.replace('\'', "'\\''"),
+                    "chmod +x .deploy_start.sh && pm2 start .deploy_start.sh --name '{}' --max-restarts 5",
                     project.name
                 )
             }
-        } else {
+        } else if trimmed_start.ends_with(".js")
+            || trimmed_start.ends_with(".mjs")
+            || trimmed_start.ends_with(".cjs")
+        {
             format!(
-                "pm2 start '{}' --name '{}' --max-restarts 5",
-                trimmed_start.replace('\'', "'\\''"),
+                "pm2 start {} --name '{}' --max-restarts 5",
+                trimmed_start, project.name
+            )
+        } else {
+            let runner_path = app_dir.join(".deploy_start.sh");
+            let runner_content = format!("#!/bin/sh\nexec {}\n", trimmed_start);
+            let _ = std::fs::write(&runner_path, runner_content);
+            format!(
+                "chmod +x .deploy_start.sh && pm2 start .deploy_start.sh --name '{}' --max-restarts 5",
                 project.name
             )
         }
     };
 
-    // 4. Siapkan environment variables
+    // 5. Siapkan environment variables
     let mut proot_envs: Vec<(String, String)> = Vec::new();
     proot_envs.push(("NODE_ENV".into(), "production".into()));
 
@@ -207,20 +360,14 @@ pub async fn start_project(
         }
     }
 
-    // 5. Pastikan direktori log PM2 ada di rootfs & eksekusi pm2 start di direktori project (/app/<name>)
-    let pm2_logs = rootfs_dir.join("root").join(".pm2").join("logs");
-    let pm2_pids = rootfs_dir.join("root").join(".pm2").join("pids");
-    let _ = std::fs::create_dir_all(&pm2_logs);
-    let _ = std::fs::create_dir_all(&pm2_pids);
-
-    let full_exec_cmd = format!("mkdir -p /root/.pm2/logs /root/.pm2/pids && {pm2_cmd}");
+    // 6. Eksekusi pm2 start di direktori project (/app/<name>)
     let cwd = format!("/app/{}", project.name);
     let mut cmd = proot_exec(
         proot_bin,
         rootfs_dir,
         tmp_dir,
         &cwd,
-        &full_exec_cmd,
+        &pm2_cmd,
         &proot_envs,
         no_seccomp,
         false, // PM2 daemon harus tetap hidup di background
@@ -278,19 +425,22 @@ pub async fn stop_project(
     tmp_dir: &Path,
     no_seccomp: bool,
 ) -> Result<Pm2Status> {
-    let stop_cmd = format!("pm2 stop '{}'", project_name);
-    let mut cmd = proot_exec(
-        proot_bin,
-        rootfs_dir,
-        tmp_dir,
-        "/",
-        &stop_cmd,
-        &[],
-        no_seccomp,
-        false,
-    );
+    let rpc_sock = rootfs_dir.join("root").join(".pm2").join("rpc.sock");
+    if rpc_sock.exists() {
+        let stop_cmd = format!("pm2 stop '{}'", project_name);
+        let mut cmd = proot_exec(
+            proot_bin,
+            rootfs_dir,
+            tmp_dir,
+            "/",
+            &stop_cmd,
+            &[],
+            no_seccomp,
+            false,
+        );
 
-    let _ = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await;
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(10), cmd.output()).await;
+    }
 
     // Ambil status terbaru
     let all = list_processes(proot_bin, rootfs_dir, tmp_dir, no_seccomp).await?;
@@ -320,6 +470,8 @@ pub async fn restart_project(
     tmp_dir: &Path,
     no_seccomp: bool,
 ) -> Result<Pm2Status> {
+    ensure_pm2_daemon_running(proot_bin, rootfs_dir, tmp_dir, no_seccomp).await?;
+
     let restart_cmd = format!("pm2 restart '{}'", project_name);
     let mut cmd = proot_exec(
         proot_bin,
@@ -378,6 +530,11 @@ pub async fn delete_process(
     tmp_dir: &Path,
     no_seccomp: bool,
 ) -> Result<()> {
+    let rpc_sock = rootfs_dir.join("root").join(".pm2").join("rpc.sock");
+    if !rpc_sock.exists() {
+        return Ok(());
+    }
+
     let delete_cmd = format!("pm2 delete '{}'", project_name);
     let mut cmd = proot_exec(
         proot_bin,
@@ -402,6 +559,11 @@ pub async fn stop_all_processes(
     tmp_dir: &Path,
     no_seccomp: bool,
 ) -> Result<()> {
+    let rpc_sock = rootfs_dir.join("root").join(".pm2").join("rpc.sock");
+    if !rpc_sock.exists() {
+        return Ok(());
+    }
+
     let mut cmd = proot_exec(
         proot_bin,
         rootfs_dir,

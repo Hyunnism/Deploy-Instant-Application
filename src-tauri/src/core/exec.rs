@@ -33,9 +33,12 @@ pub fn proot_exec(
         "/proc",
         "-b",
         "/sys",
-        "-w",
-        cwd,
     ]);
+
+    let tmp_bind = format!("{}:/tmp", tmp_dir.to_str().unwrap_or("/tmp"));
+    c.args(["-b", &tmp_bind]);
+
+    c.args(["-w", cwd]);
 
     // ponytail: kill-on-exit diaktifkan untuk build/clone agar tidak meninggalkan proses yatim;
     // dinonaktifkan (false) untuk daemon PM2 agar proses tetap hidup di background.
@@ -65,6 +68,10 @@ pub fn proot_exec(
     #[cfg(unix)]
     c.process_group(0);
 
-    c.kill_on_drop(true);
+    if kill_on_exit {
+        c.kill_on_drop(true);
+    } else {
+        c.kill_on_drop(false);
+    }
     c
 }
