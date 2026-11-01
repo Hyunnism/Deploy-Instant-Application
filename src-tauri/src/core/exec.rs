@@ -6,6 +6,7 @@ use std::path::Path;
 use tokio::process::Command;
 
 /// Membangun Command untuk mengeksekusi perintah di dalam proot rootfs
+#[allow(clippy::too_many_arguments)]
 pub fn proot_exec(
     proot_bin: &Path,
     rootfs_dir: &Path,
@@ -14,6 +15,7 @@ pub fn proot_exec(
     cmd: &str,
     env_vars: &[(String, String)],
     no_seccomp: bool,
+    kill_on_exit: bool,
 ) -> Command {
     let mut c = Command::new(proot_bin);
 
@@ -33,11 +35,15 @@ pub fn proot_exec(
         "/sys",
         "-w",
         cwd,
-        "--kill-on-exit",
-        "/bin/sh",
-        "-c",
-        &shell_cmd,
     ]);
+
+    // ponytail: kill-on-exit diaktifkan untuk build/clone agar tidak meninggalkan proses yatim;
+    // dinonaktifkan (false) untuk daemon PM2 agar proses tetap hidup di background.
+    if kill_on_exit {
+        c.arg("--kill-on-exit");
+    }
+
+    c.args(["/bin/sh", "-c", &shell_cmd]);
 
     c.env("PROOT_TMP_DIR", tmp_dir);
     c.env("HOME", "/root");

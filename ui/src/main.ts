@@ -6,12 +6,15 @@ import './styles/index.css';
 import {
   buildProject,
   cancelBuild,
+  checkAutoStart,
   checkSetupStatus,
   cloneProject,
   createProject,
   deletePat,
+  deletePm2Process,
   deleteProject,
   getPatStatus,
+  getPm2List,
   getRepoStatus,
   getSetting,
   listBuildLogs,
@@ -21,14 +24,19 @@ import {
   onSetupProgress,
   pullProject,
   readBuildLog,
+  restartProject,
   runProotProbe,
   savePat,
   setSetting,
+  startProject,
   startSetup,
+  stopAllProcesses,
+  stopProject,
   updateProject,
   verifySetup,
   type BuildLogEvent,
   type GitLogEvent,
+  type Pm2Status,
   type Project,
 } from './api';
 import { translations, type TranslationKey } from './i18n';
@@ -55,6 +63,13 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function formatUptime(seconds: number): string {
+  if (!seconds || seconds <= 0) return '0s';
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
 
 function addEngineLog(msg: string) {
@@ -244,6 +259,7 @@ function render() {
 // -------------------------------------------------------------
 function renderDashboardView(isReady: boolean): string {
   const projectCount = state.projects.length;
+  const onlineCount = Object.values(state.pm2Statuses).filter((s) => s.status === 'online').length;
 
   return `
     <!-- System Status Overview Card (Open Pi Style) -->
@@ -253,11 +269,19 @@ function renderDashboardView(isReady: boolean): string {
           <h2>${t('activeEngine')}</h2>
           <div class="overview-subtitle">${t('toolchainHeader')}</div>
         </div>
-        <div class="engine-status-pill ${isReady ? 'healthy' : 'warning'}">
-          <span class="engine-status-dot"></span>
-          <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
-          <span class="engine-status-sep"></span>
-          <span class="engine-status-detail">${isReady ? t('viewDetailPill') : t('installActionPill')}</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${onlineCount > 0
+            ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
+                ${state.isStopAllLoading ? t('stoppingAll') : '⏹ ' + t('stopAllBtn')}
+               </button>`
+            : ''
+          }
+          <div class="engine-status-pill ${isReady ? 'healthy' : 'warning'}">
+            <span class="engine-status-dot"></span>
+            <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
+            <span class="engine-status-sep"></span>
+            <span class="engine-status-detail">${isReady ? t('viewDetailPill') : t('installActionPill')}</span>
+          </div>
         </div>
       </div>
       <div class="overview-metrics">
@@ -269,7 +293,9 @@ function renderDashboardView(isReady: boolean): string {
         </div>
         <div class="metric-col">
           <span class="metric-label">${t('servicesCount')}</span>
-          <span class="metric-val">${projectCount}</span>
+          <span class="metric-val" style="color: ${onlineCount > 0 ? 'var(--success)' : 'inherit'};">
+            ${onlineCount > 0 ? `${onlineCount} Online / ${projectCount}` : projectCount}
+          </span>
         </div>
         <div class="metric-col">
           <span class="metric-label">${t('storageUsed')}</span>
@@ -314,16 +340,51 @@ function renderProjectCard(p: Project): string {
   const repo = state.repoStatuses[p.id];
   const isCloned = repo?.is_cloned ?? false;
   const isBuildingThis = state.buildModal.isOpen && state.buildModal.isBuilding && state.buildModal.projectId === p.id;
+  const pm2 = state.pm2Statuses[p.name];
+  const isPm2Busy = state.pm2Loading[p.name] || false;
+  const isMenuOpen = state.openProjectMenuId === p.id;
 
   return `
     <div class="project-card" data-id="${p.id}">
       <div class="project-card-header">
         <div class="project-identity">
           <div class="project-icon-box">${initial}</div>
-          <div class="project-name">${p.name}</div>
+          <div class="project-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
         </div>
-        <div class="project-card-actions">
-          ${!isCloned
+        <div class="project-header-right">
+          <div class="project-menu-wrapper">
+            <button class="btn-project-menu" data-id="${p.id}" title="Menu" aria-label="Menu">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <circle cx="12" cy="5" r="2.2"></circle>
+                <circle cx="12" cy="12" r="2.2"></circle>
+                <circle cx="12" cy="19" r="2.2"></circle>
+              </svg>
+            </button>
+            ${isMenuOpen ? `
+              <div class="project-dropdown-menu">
+                <button class="dropdown-item btn-edit-project" data-id="${p.id}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  <span>${t('editBtn')}</span>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item danger btn-delete-project" data-id="${p.id}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>${t('deleteBtn')}</span>
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="project-card-actions">
+        ${!isCloned
       ? `<button class="proj-action-btn clone btn-clone-project" data-id="${p.id}" ${repo?.isCloning ? 'disabled' : ''}>
                    ${repo?.isCloning ? t('cloningRepo') : t('cloneRepoBtn')}
                  </button>`
@@ -334,11 +395,32 @@ function renderProjectCard(p: Project): string {
          <button class="proj-action-btn build btn-build-project ${isBuildingThis ? 'running' : ''}" data-id="${p.id}" ${isBuildingThis ? 'disabled' : ''}>
            ${isBuildingThis ? t('buildingBtn') : t('buildBtn')}
          </button>
+         ${pm2?.status === 'online'
+           ? `
+              <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
+                ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
+              </button>
+              <button class="proj-action-btn stop btn-stop-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
+                ${isPm2Busy ? t('stoppingBtn') : t('stopBtn')}
+              </button>
+             `
+           : pm2?.status === 'errored'
+             ? `
+                <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
+                  ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
+                </button>
+                <button class="proj-action-btn stop btn-stop-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
+                  ${isPm2Busy ? t('stoppingBtn') : t('stopBtn')}
+                </button>
+               `
+             : `
+                <button class="proj-action-btn start btn-start-project" data-id="${p.id}" ${p.last_build_ok !== true || isPm2Busy ? 'disabled' : ''} title="${p.last_build_ok !== true ? t('deployRequiresBuild') : ''}">
+                  ${isPm2Busy ? t('startingBtn') : t('deployBtn')}
+                </button>
+               `
+         }
         `
     }
-          <button class="proj-action-btn edit btn-edit-project" data-id="${p.id}">${t('editBtn')}</button>
-          <button class="proj-action-btn delete btn-delete-project" data-id="${p.id}">${t('deleteBtn')}</button>
-        </div>
       </div>
 
       <div class="project-meta-row">
@@ -363,6 +445,23 @@ function renderProjectCard(p: Project): string {
         )
       )
     }
+        ${pm2?.status === 'online'
+          ? `<span class="meta-badge status-online">
+               <span class="meta-dot pulse-online"></span>
+               ${t('statusOnline')}
+             </span>`
+          : pm2?.status === 'errored'
+            ? `<span class="meta-badge status-errored">
+                 <span class="meta-dot" style="background: #ef4444;"></span>
+                 ${t('statusErrored')} (${pm2.restarts}x)
+               </span>`
+            : pm2?.status === 'stopped'
+              ? `<span class="meta-badge status-stopped">${t('statusStopped')}</span>`
+              : (isCloned && p.last_build_ok !== true
+                ? `<span class="meta-badge status-need-build">${t('statusNeedBuild')}</span>`
+                : ''
+              )
+        }
         <span class="meta-badge">
           <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="6" y1="3" x2="6" y2="15"></line>
@@ -379,7 +478,7 @@ function renderProjectCard(p: Project): string {
             <line x1="6" y1="6" x2="6.01" y2="6"></line>
             <line x1="6" y1="18" x2="6.01" y2="18"></line>
           </svg>
-          ${portLabel}
+          ${pm2?.status === 'online' && pm2.port ? `Port ${pm2.port}` : portLabel}
         </span>
         ${p.auto_start
       ? `<span class="meta-badge autostart">
@@ -400,6 +499,34 @@ function renderProjectCard(p: Project): string {
     }
       </div>
 
+      ${pm2?.status === 'online'
+        ? `
+           <div class="project-runtime-metrics">
+             <div class="runtime-metric-item">
+               <span class="lbl">${t('detectedPort')}</span>
+               <span class="val" style="color: #059669;">:${pm2.port || p.port_manual || '3000'}</span>
+             </div>
+             <div class="runtime-metric-item">
+               <span class="lbl">${t('metricCpu')}</span>
+               <span class="val">${pm2.cpu.toFixed(1)}%</span>
+             </div>
+             <div class="runtime-metric-item">
+               <span class="lbl">${t('metricMemory')}</span>
+               <span class="val">${Math.round(pm2.memory / (1024 * 1024))} MB</span>
+             </div>
+             <div class="runtime-metric-item">
+               <span class="lbl">${t('metricUptime')}</span>
+               <span class="val">${formatUptime(pm2.uptime)}</span>
+             </div>
+             <div class="runtime-metric-item">
+               <span class="lbl">${t('metricRestarts')}</span>
+               <span class="val">${pm2.restarts}</span>
+             </div>
+           </div>
+          `
+        : ''
+      }
+
       <div class="project-repo-line">
         <svg class="meta-svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
@@ -410,11 +537,11 @@ function renderProjectCard(p: Project): string {
       <div class="project-commands-grid">
         <div class="command-box">
           <div class="command-box-label">${t('cardBuild')}</div>
-          <div class="command-box-cmd">${p.build_cmd}</div>
+          <div class="command-box-cmd" title="${escapeHtml(p.build_cmd)}">${escapeHtml(p.build_cmd)}</div>
         </div>
         <div class="command-box">
           <div class="command-box-label">${t('cardStart')}</div>
-          <div class="command-box-cmd">${p.start_cmd}</div>
+          <div class="command-box-cmd" title="${escapeHtml(p.start_cmd)}">${escapeHtml(p.start_cmd)}</div>
         </div>
       </div>
     </div>
@@ -1613,9 +1740,97 @@ function attachEventListeners() {
     render();
   });
 
+  // Project PM2 Actions (Fase 7)
+  document.querySelectorAll('.btn-start-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      if (p.last_build_ok !== true) {
+        alert(t('deployRequiresBuild'));
+        return;
+      }
+      state.pm2Loading[p.name] = true;
+      render();
+      try {
+        const res = await startProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-stop-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      state.pm2Loading[p.name] = true;
+      render();
+      try {
+        const res = await stopProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-restart-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      state.pm2Loading[p.name] = true;
+      render();
+      try {
+        const res = await restartProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.getElementById('btn-stop-all')?.addEventListener('click', async (e) => {
+    e.stopPropagation(); // Mencegah membuka engine detail modal
+    state.isStopAllLoading = true;
+    render();
+    try {
+      await stopAllProcesses();
+    } catch (err: any) {
+      alert(String(err));
+    } finally {
+      state.isStopAllLoading = false;
+      await refreshPm2Statuses();
+    }
+  });
+
+  // Project Kebab Menu toggle (Ubah & Hapus)
+  document.querySelectorAll('.btn-project-menu').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      state.openProjectMenuId = state.openProjectMenuId === id ? null : id;
+      render();
+    });
+  });
+
   // Project Edit buttons
   document.querySelectorAll('.btn-edit-project').forEach((el) => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
       const id = Number(el.getAttribute('data-id'));
       const p = state.projects.find((proj) => proj.id === id);
       if (!p) return;
@@ -1644,7 +1859,9 @@ function attachEventListeners() {
 
   // Project Delete buttons
   document.querySelectorAll('.btn-delete-project').forEach((el) => {
-    el.addEventListener('click', () => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
       const id = Number(el.getAttribute('data-id'));
       const p = state.projects.find((proj) => proj.id === id);
       if (!p) return;
@@ -1671,9 +1888,11 @@ function attachEventListeners() {
     render();
 
     try {
+      await deletePm2Process(state.deleteModal.project.id);
       await deleteProject(state.deleteModal.project.id);
       state.deleteModal.isOpen = false;
       await loadProjects();
+      await refreshPm2Statuses();
     } catch (err: any) {
       state.deleteModal.isDeleting = false;
       state.deleteModal.error = String(err);
@@ -1910,6 +2129,60 @@ async function loadProjects() {
   }
 }
 
+let pm2PollInterval: number | null = null;
+
+async function refreshPm2Statuses() {
+  try {
+    const list = await getPm2List();
+    const map: Record<string, Pm2Status> = {};
+    for (const item of list) {
+      map[item.name] = item;
+    }
+    state.pm2Statuses = map;
+    render();
+  } catch (e) {
+    console.warn('Failed to refresh PM2 statuses:', e);
+  }
+}
+
+function startPm2AdaptivePolling() {
+  if (pm2PollInterval) {
+    clearInterval(pm2PollInterval);
+    pm2PollInterval = null;
+  }
+  if (document.hidden) return; // PRD 8.8 & 13: 0 detik saat background
+
+  // 5000 ms polling saat tampilan aktif
+  pm2PollInterval = window.setInterval(() => {
+    if (!document.hidden) {
+      refreshPm2Statuses();
+    }
+  }, 5000);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (pm2PollInterval) {
+      clearInterval(pm2PollInterval);
+      pm2PollInterval = null;
+    }
+  } else {
+    refreshPm2Statuses();
+    startPm2AdaptivePolling();
+  }
+});
+
+// Tutup kebab menu jika klik di luar
+document.addEventListener('click', (e) => {
+  if (state.openProjectMenuId !== null) {
+    const target = e.target as HTMLElement;
+    if (!target.closest('.project-menu-wrapper')) {
+      state.openProjectMenuId = null;
+      render();
+    }
+  }
+});
+
 async function init() {
   render();
 
@@ -1963,6 +2236,16 @@ async function init() {
 
   // Load projects
   await loadProjects();
+
+  // Load initial PM2 statuses & check auto-start
+  try {
+    await checkAutoStart();
+  } catch (e) {
+    console.warn('Auto-start check error:', e);
+  }
+
+  await refreshPm2Statuses();
+  startPm2AdaptivePolling();
 }
 
 init();

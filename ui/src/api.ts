@@ -45,6 +45,18 @@ export interface EnvVarItem {
   value: string;
 }
 
+export interface Pm2Status {
+  name: string;
+  status: string; // "online" | "stopped" | "errored" | "launching" | "stopping"
+  pid?: number | null;
+  pm_id?: number | null;
+  uptime: number;
+  restarts: number;
+  cpu: number;
+  memory: number;
+  port?: number | null;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -263,6 +275,36 @@ export async function deleteProjectEnvVar(id: number, key: string): Promise<void
 export async function importDotenv(id: number, content: string): Promise<EnvVarItem[]> {
   return await invoke<EnvVarItem[]>('project_env_import_dotenv', { id, content });
 }
+
+// Fase 7: PM2 Process Management
+export async function startProject(projectId: number): Promise<Pm2Status> {
+  return await invoke<Pm2Status>('pm2_start', { projectId });
+}
+
+export async function stopProject(projectId: number): Promise<Pm2Status> {
+  return await invoke<Pm2Status>('pm2_stop', { projectId });
+}
+
+export async function restartProject(projectId: number): Promise<Pm2Status> {
+  return await invoke<Pm2Status>('pm2_restart', { projectId });
+}
+
+export async function deletePm2Process(projectId: number): Promise<void> {
+  return await invoke<void>('pm2_delete', { projectId });
+}
+
+export async function getPm2List(): Promise<Pm2Status[]> {
+  return await invoke<Pm2Status[]>('pm2_list');
+}
+
+export async function stopAllProcesses(): Promise<void> {
+  return await invoke<void>('pm2_stop_all');
+}
+
+export async function checkAutoStart(): Promise<Pm2Status[]> {
+  return await invoke<Pm2Status[]>('pm2_check_autostart');
+}
+
 
 
 

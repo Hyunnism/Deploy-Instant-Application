@@ -55,6 +55,7 @@ pub async fn system_run_probe(
         "uname -m",
         &[],
         no_seccomp,
+        true,
     );
     let output_uname = cmd_uname
         .output()
@@ -73,6 +74,7 @@ pub async fn system_run_probe(
         "node -v",
         &[],
         no_seccomp,
+        true,
     );
     let output_node = cmd_node
         .output()
@@ -91,6 +93,7 @@ pub async fn system_run_probe(
         "git --version",
         &[],
         no_seccomp,
+        true,
     );
     let output_git = cmd_git.output().await;
     let git_str = match output_git {
@@ -114,6 +117,7 @@ pub async fn system_run_probe(
         "curl -Is --connect-timeout 5 https://registry.npmjs.org | head -n 1",
         &[],
         no_seccomp,
+        true,
     );
     let net_output = cmd_net.output().await;
     let net_str = match net_output {

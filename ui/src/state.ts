@@ -1,5 +1,6 @@
 import type {
   PingResponse,
+  Pm2Status,
   ProbeResult,
   Project,
   SetupProgress,
@@ -124,6 +125,12 @@ export interface AppState {
     error: string | null;
     successMessage: string | null;
   };
+
+  // Fase 7 PM2 Process State
+  pm2Statuses: Record<string, Pm2Status>;
+  pm2Loading: Record<string, boolean>;
+  isStopAllLoading: boolean;
+  openProjectMenuId: number | null;
 }
 
 export const defaultFormData: ProjectFormData = {
@@ -214,4 +221,8 @@ export const state: AppState = {
     error: null,
     successMessage: null,
   },
+  pm2Statuses: {},
+  pm2Loading: {},
+  isStopAllLoading: false,
+  openProjectMenuId: null,
 };

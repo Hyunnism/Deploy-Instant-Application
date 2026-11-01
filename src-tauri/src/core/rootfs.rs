@@ -339,14 +339,32 @@ pub async fn verify_installed_toolchain(
     let tmp_dir = app_files_dir.join("tmp");
 
     // 1. Node.js
-    let mut cmd_node = proot_exec(&proot_bin, rootfs_dir, &tmp_dir, "/", "node -v", &[], false);
+    let mut cmd_node = proot_exec(
+        &proot_bin,
+        rootfs_dir,
+        &tmp_dir,
+        "/",
+        "node -v",
+        &[],
+        false,
+        true,
+    );
     let node_ver = match cmd_node.output().await {
         Ok(out) => String::from_utf8_lossy(&out.stdout).trim().to_string(),
         Err(e) => format!("err: {e}"),
     };
 
     // 2. PM2
-    let mut cmd_pm2 = proot_exec(&proot_bin, rootfs_dir, &tmp_dir, "/", "pm2 -v", &[], false);
+    let mut cmd_pm2 = proot_exec(
+        &proot_bin,
+        rootfs_dir,
+        &tmp_dir,
+        "/",
+        "pm2 -v",
+        &[],
+        false,
+        true,
+    );
     let pm2_ver = match cmd_pm2.output().await {
         Ok(out) => {
             let s = String::from_utf8_lossy(&out.stdout);
@@ -370,6 +388,7 @@ pub async fn verify_installed_toolchain(
         "cloudflared --version",
         &[],
         false,
+        true,
     );
     let cf_ver = match cmd_cf.output().await {
         Ok(out) => {
@@ -392,6 +411,7 @@ pub async fn verify_installed_toolchain(
         "git --version",
         &[],
         false,
+        true,
     );
     let git_ver = match cmd_git.output().await {
         Ok(out) => {

@@ -51,6 +51,13 @@ pub fn run() {
             commands::project::setting_get,
             commands::project::setting_set,
             commands::project::setting_list,
+            commands::pm2::pm2_start,
+            commands::pm2::pm2_stop,
+            commands::pm2::pm2_restart,
+            commands::pm2::pm2_delete,
+            commands::pm2::pm2_list,
+            commands::pm2::pm2_stop_all,
+            commands::pm2::pm2_check_autostart,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

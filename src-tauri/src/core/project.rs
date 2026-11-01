@@ -87,6 +87,7 @@ pub async fn get_project_repo_status(
         "git rev-parse --short HEAD",
         &[],
         false,
+        true,
     );
     let hash_out = cmd_hash.output().await;
     let commit_hash = match hash_out {
@@ -106,6 +107,7 @@ pub async fn get_project_repo_status(
         "git log -1 --pretty=%s",
         &[],
         false,
+        true,
     );
     let msg_out = cmd_msg.output().await;
     let commit_message = match msg_out {
@@ -125,6 +127,7 @@ pub async fn get_project_repo_status(
         "git branch --show-current",
         &[],
         false,
+        true,
     );
     let branch_out = cmd_branch.output().await;
     let branch = match branch_out {
@@ -304,6 +307,7 @@ pub async fn git_clone(
         &clone_cmd,
         &extra_envs,
         false,
+        true,
     );
 
     command.stdout(Stdio::piped());
@@ -429,6 +433,7 @@ pub async fn git_pull(
         &pull_cmd,
         &extra_envs,
         false,
+        true,
     );
 
     command.stdout(Stdio::piped());
@@ -582,7 +587,7 @@ pub async fn build_project(
     let cwd = format!("/app/{}", project.name);
 
     let mut command = proot_exec(
-        &proot_bin, rootfs_dir, &tmp_dir, &cwd, &full_cmd, &envs, false,
+        &proot_bin, rootfs_dir, &tmp_dir, &cwd, &full_cmd, &envs, false, true,
     );
 
     command.stdout(Stdio::piped());
