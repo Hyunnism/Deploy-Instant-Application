@@ -281,24 +281,26 @@ body {
 
 .overview-metrics {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
+  grid-template-columns: 1fr 1.35fr 1fr;
   padding-top: 12px;
   border-top: 1px solid var(--border-light);
+  align-items: center;
 }
 
 .metric-col {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .metric-col:not(:last-child) {
-  padding-right: 12px;
+  padding-right: 8px;
   border-right: 1px solid var(--border-light);
 }
 
 .metric-col:not(:first-child) {
-  padding-left: 12px;
+  padding-left: 8px;
 }
 
 .metric-label {
@@ -307,12 +309,17 @@ body {
   color: var(--text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .metric-val {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 /* Section Header */
@@ -321,6 +328,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-top: 4px;
+  gap: 12px;
 }
 
 .section-title {
@@ -328,6 +336,14 @@ body {
   font-weight: 700;
   color: var(--text-main);
   letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.section-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 /* Project Cards Grid & Empty State */
@@ -531,20 +547,21 @@ body {
   margin: 3px 0;
 }
 
-/* Action buttons: Sleek, quiet, perfectly proportioned */
+/* Action buttons: Sleek, symmetrical, perfectly proportioned */
 .project-card-actions {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
-  flex-wrap: wrap;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .proj-action-btn {
-  height: 30px;
-  padding: 0 13px;
+  height: 32px;
+  width: 100%;
+  padding: 0 4px;
   border-radius: 8px;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.12s ease;
@@ -553,6 +570,7 @@ body {
   justify-content: center;
   line-height: 1;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .proj-action-btn.clone {
@@ -633,21 +651,23 @@ body {
   background: #fee2e2;
 }
 
-/* Stop All Button in Overview */
+/* Stop All Button in Section Header */
 .btn-stop-all-pill {
-  height: 26px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 12px;
   background: #fef2f2;
-  border: 1px solid #fca5a5;
-  color: #b91c1c;
-  border-radius: 13px;
-  font-size: 0.72rem;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 16px;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  white-space: nowrap;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .btn-stop-all-pill:active {

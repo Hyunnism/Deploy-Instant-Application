@@ -269,19 +269,11 @@ function renderDashboardView(isReady: boolean): string {
           <h2>${t('activeEngine')}</h2>
           <div class="overview-subtitle">${t('toolchainHeader')}</div>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          ${onlineCount > 0
-            ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
-                ${state.isStopAllLoading ? t('stoppingAll') : '⏹ ' + t('stopAllBtn')}
-               </button>`
-            : ''
-          }
-          <div class="engine-status-pill ${isReady ? 'healthy' : 'warning'}">
-            <span class="engine-status-dot"></span>
-            <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
-            <span class="engine-status-sep"></span>
-            <span class="engine-status-detail">${isReady ? t('viewDetailPill') : t('installActionPill')}</span>
-          </div>
+        <div class="engine-status-pill ${isReady ? 'healthy' : 'warning'}">
+          <span class="engine-status-dot"></span>
+          <span class="engine-status-text">${isReady ? t('statusReady') : t('statusNotReady')}</span>
+          <span class="engine-status-sep"></span>
+          <span class="engine-status-detail">${isReady ? t('viewDetailPill') : t('installActionPill')}</span>
         </div>
       </div>
       <div class="overview-metrics">
@@ -294,7 +286,7 @@ function renderDashboardView(isReady: boolean): string {
         <div class="metric-col">
           <span class="metric-label">${t('servicesCount')}</span>
           <span class="metric-val" style="color: ${onlineCount > 0 ? 'var(--success)' : 'inherit'};">
-            ${onlineCount > 0 ? `${onlineCount} Online / ${projectCount}` : projectCount}
+            ${onlineCount > 0 ? `${onlineCount} / ${projectCount} Online` : `${projectCount} Project`}
           </span>
         </div>
         <div class="metric-col">
@@ -307,9 +299,17 @@ function renderDashboardView(isReady: boolean): string {
     <!-- Project List Section -->
     <section class="section-header">
       <h3 class="section-title">${t('projectListHeader')}</h3>
-      <button class="pill-icon-btn primary" id="btn-create-project-header">
-        ${t('newProjectBtn')}
-      </button>
+      <div class="section-header-actions">
+        ${onlineCount > 0
+          ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
+              ${state.isStopAllLoading ? t('stoppingAll') : '⏹ ' + t('stopAllBtn')}
+             </button>`
+          : ''
+        }
+        <button class="pill-icon-btn primary" id="btn-create-project-header">
+          ${t('newProjectBtn')}
+        </button>
+      </div>
     </section>
 
     <div class="projects-container">
