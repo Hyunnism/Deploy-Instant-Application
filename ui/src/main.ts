@@ -501,7 +501,7 @@ function renderDashboardView(isReady: boolean): string {
       <div class="section-header-actions">
         ${onlineCount > 0
       ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
-              ${state.isStopAllLoading ? t('stoppingAll') : '⏹ ' + t('stopAllBtn')}
+              ${state.isStopAllLoading ? t('stoppingAll') : t('stopAllBtn')}
              </button>`
       : ''
     }
