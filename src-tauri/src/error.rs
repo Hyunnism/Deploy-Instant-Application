@@ -20,4 +20,11 @@ impl fmt::Display for AppError {
 
 impl std::error::Error for AppError {}
 
+#[cfg(target_os = "android")]
+impl From<jni::errors::Error> for AppError {
+    fn from(err: jni::errors::Error) -> Self {
+        Self::Internal(format!("JNI error: {err}"))
+    }
+}
+
 pub type Result<T> = std::result::Result<T, AppError>;

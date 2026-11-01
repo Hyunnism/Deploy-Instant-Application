@@ -36,8 +36,11 @@ async fn get_active_project_ports(
         .await
         .unwrap_or_default()
         .into_iter()
-        .filter(|p| p.status == "online" && p.port.is_some())
-        .map(|p| (p.name, p.port.unwrap()))
+        .filter(|p| p.status == "online")
+        .filter_map(|p| {
+            let active_port = p.detected_port.or(p.port);
+            active_port.map(|port| (p.name, port))
+        })
         .collect()
 }
 
@@ -192,4 +195,15 @@ pub async fn runtime_logs_stop(app: AppHandle, project_id: i64) -> Result<(), St
     let stream_mgr = app.state::<pm2::ActiveLogStreamManager>();
     pm2::stop_runtime_log_stream(project_id, stream_mgr.inner()).await;
     Ok(())
+}
+
+/// Membuka URL lokal di browser eksternal via Android Native Intent (PRD 9.5 & 13 Fase 9)
+#[tauri::command]
+pub async fn open_local_url(port: u16) -> Result<(), String> {
+    if !(1024..=65535).contains(&port) {
+        return Err(format!("Port {port} tidak valid (rentang 1024-65535)"));
+    }
+
+    let url = format!("http://localhost:{port}");
+    crate::core::port::open_in_browser(&url).map_err(|e| e.to_string())
 }

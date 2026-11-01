@@ -58,7 +58,7 @@ pub struct SettingItem {
     pub value: String,
 }
 
-/// PM2 Process Status summary (PRD Section 8.4)
+/// PM2 Process Status summary (PRD Section 8.4 & 13 Fase 9)
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Pm2Status {
     pub name: String,
@@ -70,6 +70,8 @@ pub struct Pm2Status {
     pub cpu: f32,
     pub memory: u64,
     pub port: Option<u16>,
+    #[serde(default)]
+    pub detected_port: Option<u16>,
 }
 
 /// Probe Result model for Fase 1 (PRD Section 13 Fase 1)

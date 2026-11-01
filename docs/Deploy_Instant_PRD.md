@@ -744,20 +744,39 @@ deploy-instant/
 **Fokus:** hanya logika port dan tombol Buka lokal.
 
 **Checklist Kode**
-- [ ] `port.rs`: resolusi manual > env `PORT` > auto (8.7).
-- [ ] Deteksi port listen milik PID dari `/proc/net/tcp(6)` dan fd, atau `ss -ltnp` sebagai cadangan.
-- [ ] Cek bentrok sebelum start, dengan pesan menyebut project pemilik.
-- [ ] Tampilan "Terdeteksi: N" di UI bila berbeda.
-- [ ] Tombol "Buka lokal" (intent browser atau WebView).
+- [x] `port.rs`: resolusi manual > env `PORT` > auto (8.7).
+- [x] Deteksi port listen milik PID dari `/proc/net/tcp(6)` dan fd, atau `ss -ltnp` sebagai cadangan.
+- [x] Cek bentrok sebelum start, dengan pesan menyebut project pemilik.
+- [x] Tampilan "Terdeteksi: N" di UI bila berbeda.
+- [x] Tombol "Buka lokal" (intent browser via Android JNI `ACTION_VIEW`).
 
 **Checklist Pengujian**
-- [ ] Kode hardcode `listen(3000)` tanpa field port: terdeteksi 3000.
-- [ ] Kode memakai `process.env.PORT`: auto-assign bekerja.
-- [ ] Dua project sama-sama port 3000: yang kedua ditolak dengan pesan benar.
-- [ ] Port manual diisi: `PORT` tidak disuntikkan.
-- [ ] Buka lokal menampilkan aplikasi.
+- [x] Kode hardcode `listen(3000)` tanpa field port: terdeteksi 3000.
+- [x] Kode memakai `process.env.PORT`: auto-assign bekerja (3001+).
+- [x] Dua project sama-sama port 3001: yang kedua ditolak dengan pesan benar ("Port 3001 sedang digunakan oleh project 'spoon-app'").
+- [x] Port manual diisi: `PORT` tidak disuntikkan.
+- [x] Buka lokal menampilkan aplikasi langsung di browser sistem Android via JNI Intent `ACTION_VIEW` `http://localhost:3001`.
 
-**Kriteria selesai:** port selalu benar dan bentrok tertangani, dan akses lokal berfungsi.
+**Laporan Hasil Uji Nyata di HP Fisik (Xiaomi/Poco arm64 - Android 10+):**
+- **Perangkat Uji:** Device ID `462a07fa0405`, Arch `aarch64`, Android 10+ (Unprivileged UID `10438`).
+- **Resolusi Port Bertingkat:**
+  - *Manual Priority:* Port manual `3001` diprioritaskan tanpa menyuntikkan env `PORT`.
+  - *Env PORT Priority:* Bila ada `PORT` di daftar environment variable, nilai tersebut digunakan.
+  - *Auto-assign:* Bila kosong, sistem otomatis mengalokasikan port bebas `>= 3001`.
+- **Socket Inspection Kernel Linux (`/proc/net/tcp` & `/proc/net/tcp6`):**
+  - Node.js IPv6 dual-stack socket terdeteksi di `/proc/net/tcp6` pada slot `0` dengan state `0A` (`TCP_LISTEN`), hex `0BB9` (= port 3001), dan UID `10438`.
+  - Sistem berhasil mengekstrak port listening riil tanpa memerlukan akses root.
+- **Validasi Bentrok Port (Pre-Start):**
+  - Proyek `spoon-app` sedang online di port 3001.
+  - Proyek baru `conflict-app` dengan port manual 3001 mencoba start.
+  - Sistem menolak seketika sebelum PM2 spawn dengan pesan error: `Validation error: Port 3001 sedang digunakan oleh project 'spoon-app'.` (Lulus 100%).
+- **Akses Lokal Instan ("Buka Lokal"):**
+  - Tombol `↗ Buka Lokal` muncul di kartu proyek dan menu titik 3 (⋮).
+  - Menekan tombol memanggil command Rust `open_local_url` yang menerbitkan Android Native Intent via JNI:
+    `ActivityTaskManager: START u0 {act=android.intent.action.VIEW dat=http://localhost:3001/... flg=0x10000000}`.
+  - Browser sistem Android berhasil membuka `http://localhost:3001` dan merespons `Hello from Deploy Instant PM2!`.
+
+**Kriteria selesai:** port selalu benar dan bentrok tertangani, dan akses lokal berfungsi. *(SELESAI LULUS 100%)*
 
 ---
 

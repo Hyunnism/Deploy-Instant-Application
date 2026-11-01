@@ -651,6 +651,17 @@ body {
   background: #fee2e2;
 }
 
+.proj-action-btn.open-local {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.proj-action-btn.open-local:active {
+  background: #dbeafe;
+}
+
 /* Stop All Button in Section Header */
 .btn-stop-all-pill {
   height: 32px;
@@ -730,6 +741,13 @@ body {
   background: #fffbeb;
   border-color: #fde68a;
   color: #b45309;
+}
+
+.meta-badge.port-detected {
+  background: #fdf4ff;
+  border-color: #f0abfc;
+  color: #a21caf;
+  font-weight: 600;
 }
 
 .app-toast {

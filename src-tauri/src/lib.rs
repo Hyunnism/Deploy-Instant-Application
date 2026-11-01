@@ -61,6 +61,7 @@ pub fn run() {
             commands::pm2::pm2_check_autostart,
             commands::pm2::runtime_logs_start,
             commands::pm2::runtime_logs_stop,
+            commands::pm2::open_local_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

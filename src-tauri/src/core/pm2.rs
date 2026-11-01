@@ -255,6 +255,13 @@ pub fn parse_pm2_jlist(raw_stdout: &str) -> Result<Vec<Pm2Status>> {
                     .and_then(|p| u16::try_from(p).ok())
             });
 
+        // Deteksi port listening riil dari kernel socket inspection (PRD 8.7 & 13 Fase 9)
+        let detected_port = if status == "online" {
+            crate::core::port::detect_process_listening_port(pid, port)
+        } else {
+            None
+        };
+
         result.push(Pm2Status {
             name,
             status,
@@ -265,6 +272,7 @@ pub fn parse_pm2_jlist(raw_stdout: &str) -> Result<Vec<Pm2Status>> {
             cpu,
             memory,
             port,
+            detected_port,
         });
     }
 
@@ -424,6 +432,7 @@ pub async fn start_project(
             cpu: 0.0,
             memory: 0,
             port: Some(target_port),
+            detected_port: Some(target_port),
         });
 
     Ok(proc_status)
@@ -469,6 +478,7 @@ pub async fn stop_project(
             cpu: 0.0,
             memory: 0,
             port: None,
+            detected_port: None,
         });
 
     Ok(status)
@@ -529,6 +539,7 @@ pub async fn restart_project(
             cpu: 0.0,
             memory: 0,
             port: None,
+            detected_port: None,
         });
 
     Ok(status)

@@ -55,6 +55,7 @@ export interface Pm2Status {
   cpu: number;
   memory: number;
   port?: number | null;
+  detected_port?: number | null;
 }
 
 export interface Project {
@@ -325,6 +326,11 @@ export async function onRuntimeLog(
   callback: (event: RuntimeLogEvent) => void
 ): Promise<UnlistenFn> {
   return await listen<RuntimeLogEvent>('runtime:log', (e) => callback(e.payload));
+}
+
+// Fase 9: Port & Akses Lokal
+export async function openLocalUrl(port: number): Promise<void> {
+  return await invoke<void>('open_local_url', { port });
 }
 
 

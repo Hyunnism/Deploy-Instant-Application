@@ -179,6 +179,11 @@ export const translations = {
     autoScrollLabel: 'Auto-scroll',
     clearLogsBtn: 'Bersihkan',
     noRuntimeLogsYet: 'Belum ada log runtime yang tercatat...',
+
+    // Fase 9 Port & Local Access
+    openLocalBtn: 'Buka Lokal',
+    openLocalTitle: 'Buka Aplikasi di Browser',
+    detectedPortLabel: 'Terdeteksi',
   },
   en: {
     appName: 'Deploy Instant',
@@ -355,6 +360,11 @@ export const translations = {
     autoScrollLabel: 'Auto-scroll',
     clearLogsBtn: 'Clear',
     noRuntimeLogsYet: 'No runtime logs recorded yet...',
+
+    // Fase 9 Port & Local Access
+    openLocalBtn: 'Open Local',
+    openLocalTitle: 'Open App in Browser',
+    detectedPortLabel: 'Detected',
   },
 } as const;
 

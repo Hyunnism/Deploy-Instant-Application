@@ -22,6 +22,7 @@ import {
   onBuildLog,
   onGitLog,
   onSetupProgress,
+  openLocalUrl,
   pullProject,
   readBuildLog,
   restartProject,
@@ -541,6 +542,7 @@ function renderProjectCard(p: Project): string {
   const pm2 = state.pm2Statuses[p.name];
   const isPm2Busy = state.pm2Loading[p.name] || false;
   const isMenuOpen = state.openProjectMenuId === p.id;
+  const activePort = pm2?.detected_port || pm2?.port || p.port_manual || 3000;
 
   return `
     <div class="project-card" data-id="${p.id}">
@@ -560,6 +562,17 @@ function renderProjectCard(p: Project): string {
             </button>
             ${isMenuOpen ? `
               <div class="project-dropdown-menu">
+                ${pm2?.status === 'online' ? `
+                  <button class="dropdown-item btn-open-local" data-port="${activePort}">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                      <polyline points="15 3 21 3 21 9"></polyline>
+                      <line x1="10" y1="14" x2="21" y2="3"></line>
+                    </svg>
+                    <span>${t('openLocalBtn')} (:${activePort})</span>
+                  </button>
+                  <div class="dropdown-divider"></div>
+                ` : ''}
                 <button class="dropdown-item btn-view-runtime-log" data-id="${p.id}">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="4 17 10 11 4 5"></polyline>
@@ -603,6 +616,9 @@ function renderProjectCard(p: Project): string {
          </button>
          ${pm2?.status === 'online'
         ? `
+              <button class="proj-action-btn open-local btn-open-local" data-port="${activePort}" title="${t('openLocalTitle')}">
+                ↗ ${t('openLocalBtn')}
+              </button>
               <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
                 ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
               </button>
@@ -686,6 +702,12 @@ function renderProjectCard(p: Project): string {
           </svg>
           ${pm2?.status === 'online' && pm2.port ? `Port ${pm2.port}` : portLabel}
         </span>
+        ${pm2?.status === 'online' && pm2.detected_port && pm2.port && pm2.detected_port !== pm2.port
+      ? `<span class="meta-badge port-detected" title="${t('detectedPortLabel')}: ${pm2.detected_port}">
+           ⚡ ${t('detectedPortLabel')}: ${pm2.detected_port}
+         </span>`
+      : ''
+    }
         ${p.auto_start
       ? `<span class="meta-badge autostart">
                  <span class="meta-dot"></span>
@@ -710,7 +732,7 @@ function renderProjectCard(p: Project): string {
            <div class="project-runtime-metrics">
              <div class="runtime-metric-item">
                <span class="lbl">${t('detectedPort')}</span>
-               <span class="val" style="color: #059669;">:${pm2.port || p.port_manual || '3000'}</span>
+               <span class="val" style="color: #059669;">:${activePort}${pm2.detected_port && pm2.port && pm2.detected_port !== pm2.port ? ` (⚡${pm2.detected_port})` : ''}</span>
              </div>
              <div class="runtime-metric-item">
                <span class="lbl">${t('metricCpu')}</span>
@@ -1752,6 +1774,23 @@ function attachViewEventListeners() {
       e.stopPropagation();
       const id = Number(el.getAttribute('data-id'));
       await openRuntimeLogsModal(id);
+    });
+  });
+
+  // Open Local Browser (Fase 9)
+  document.querySelectorAll('.btn-open-local').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      renderView();
+      const port = Number(el.getAttribute('data-port'));
+      if (port) {
+        try {
+          await openLocalUrl(port);
+        } catch (err: any) {
+          alert(String(err));
+        }
+      }
     });
   });
 
