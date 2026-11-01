@@ -131,6 +131,7 @@ export interface AppState {
   pm2Loading: Record<string, boolean>;
   isStopAllLoading: boolean;
   openProjectMenuId: number | null;
+  modalAnimateIn: boolean;
 
   // Fase 8 PM2 Runtime Logs State
   runtimeLogsModal: {
@@ -246,6 +247,7 @@ export const state: AppState = {
   pm2Loading: {},
   isStopAllLoading: false,
   openProjectMenuId: null,
+  modalAnimateIn: false,
 
   // Fase 8
   runtimeLogsModal: {

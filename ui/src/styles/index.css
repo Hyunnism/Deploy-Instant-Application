@@ -917,8 +917,28 @@ body {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
+}
+
+.modal-overlay.animate-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-overlay.animate-in .modal-sheet {
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-overlay.animate-in .delete-confirm-box {
+  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (min-width: 600px) {

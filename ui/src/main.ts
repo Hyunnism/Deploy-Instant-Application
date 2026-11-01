@@ -271,19 +271,22 @@ function appendRuntimeLogLine(event: RuntimeLogEvent) {
   }
 }
 
-function getRuntimeLogsHtml(): string {
-  const modal = state.runtimeLogsModal;
-  const curFilter = modal.filter;
-  const filtered = modal.logs.filter((item) => {
+function renderRuntimeLogsLines() {
+  const container = document.getElementById('runtime-logs-content');
+  if (!container) return;
+
+  const curFilter = state.runtimeLogsModal.filter;
+  const filtered = state.runtimeLogsModal.logs.filter((item) => {
     if (curFilter === 'all') return true;
     return item.stream === curFilter;
   });
 
   if (filtered.length === 0) {
-    return `<div class="log-line muted">${t('noRuntimeLogsYet')}</div>`;
+    container.innerHTML = `<div class="log-line muted">${t('noRuntimeLogsYet')}</div>`;
+    return;
   }
 
-  return filtered
+  container.innerHTML = filtered
     .map((item) => {
       const isErr = item.stream === 'stderr';
       const timeFormatted = formatLogTime(item.timestamp);
@@ -296,12 +299,6 @@ function getRuntimeLogsHtml(): string {
       `;
     })
     .join('');
-}
-
-function renderRuntimeLogsLines() {
-  const container = document.getElementById('runtime-logs-content');
-  if (!container) return;
-  container.innerHTML = getRuntimeLogsHtml();
 
   if (state.runtimeLogsModal.autoScroll) {
     container.scrollTop = container.scrollHeight;
@@ -330,7 +327,8 @@ async function openRuntimeLogsModal(projectId: number) {
     unlistenFn: null,
   };
 
-  render();
+  renderView();
+  renderModals(true);
   renderRuntimeLogsLines();
 
   try {
@@ -347,7 +345,7 @@ async function closeRuntimeLogsModal() {
   state.runtimeLogsModal.isOpen = false;
   state.runtimeLogsModal.isStreaming = false;
   state.runtimeLogsModal.projectId = null;
-  render();
+  renderModals(false);
 
   if (pid) {
     try {
@@ -359,56 +357,99 @@ async function closeRuntimeLogsModal() {
 }
 
 // -------------------------------------------------------------
-// RENDER CONTROLLER
+// RENDER CONTROLLER (MODAL-VIEW DECOUPLING FOR ZERO-FLICKER)
 // -------------------------------------------------------------
-function render() {
+function isAnyModalOpen(): boolean {
+  return (
+    state.formModal.isOpen ||
+    state.deleteModal.isOpen ||
+    state.engineModal.isOpen ||
+    state.gitLogModal.isOpen ||
+    state.buildModal.isOpen ||
+    state.dotenvModal.isOpen ||
+    state.runtimeLogsModal.isOpen
+  );
+}
+
+function ensureShell(): { viewEl: HTMLElement; modalEl: HTMLElement } {
+  let viewEl = document.getElementById('main-view-container');
+  let modalEl = document.getElementById('modal-container');
+  if (!viewEl || !modalEl) {
+    appEl.innerHTML = `
+      <div class="app-container" id="main-view-container"></div>
+      <div id="modal-container"></div>
+    `;
+    viewEl = document.getElementById('main-view-container')!;
+    modalEl = document.getElementById('modal-container')!;
+  }
+  return { viewEl, modalEl };
+}
+
+function renderView() {
+  const { viewEl } = ensureShell();
   const isReady = state.setupInfo?.is_ready ?? false;
 
-  appEl.innerHTML = `
-    <div class="app-container">
-      <!-- Top Navigation Bar -->
-      <nav class="top-nav">
-        <button class="top-nav-btn" id="btn-open-settings" title="${t('settingsTab')}">
-          ⚙️
+  viewEl.innerHTML = `
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+      <button class="top-nav-btn" id="btn-open-settings" title="${t('settingsTab')}">
+        ⚙️
+      </button>
+      <span class="top-nav-title">${t('appName')}</span>
+      <div class="top-nav-actions">
+        <button class="pill-icon-btn" id="btn-open-diagnostics" title="${t('diagnosticsTab')}">
+          <span>💻</span>
         </button>
-        <span class="top-nav-title">${t('appName')}</span>
-        <div class="top-nav-actions">
-          <button class="pill-icon-btn" id="btn-open-diagnostics" title="${t('diagnosticsTab')}">
-            <span>💻</span>
-          </button>
-          <button class="pill-icon-btn primary" id="btn-create-project-top">
-            <span>+</span>
-          </button>
-        </div>
-      </nav>
+        <button class="pill-icon-btn primary" id="btn-create-project-top">
+          <span>+</span>
+        </button>
+      </div>
+    </nav>
 
-      <!-- Active View -->
-      ${state.activeTab === 'settings'
+    <!-- Active View -->
+    ${state.activeTab === 'settings'
       ? renderSettingsView()
       : state.activeTab === 'diagnostics'
         ? renderDiagnosticsView()
         : renderDashboardView(isReady)
     }
-
-      <!-- Modals -->
-      ${renderFormModal()}
-      ${renderDeleteModal()}
-      ${renderEngineModal()}
-      ${renderGitLogModal()}
-      ${renderBuildModal()}
-      ${renderDotenvModal()}
-      ${renderRuntimeLogsModal()}
-    </div>
   `;
 
-  attachEventListeners();
+  attachViewEventListeners();
+}
 
-  if (state.runtimeLogsModal.isOpen && state.runtimeLogsModal.autoScroll) {
-    const container = document.getElementById('runtime-logs-content');
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-    }
+let modalAnimateTimer: number | null = null;
+
+function renderModals(animate = false) {
+  const { modalEl } = ensureShell();
+
+  if (animate) {
+    state.modalAnimateIn = true;
+    if (modalAnimateTimer) clearTimeout(modalAnimateTimer);
+    modalAnimateTimer = window.setTimeout(() => {
+      state.modalAnimateIn = false;
+      document.querySelectorAll('.modal-overlay.animate-in').forEach((el) => {
+        el.classList.remove('animate-in');
+      });
+    }, 280);
   }
+
+  modalEl.innerHTML = `
+    ${renderFormModal()}
+    ${renderDeleteModal()}
+    ${renderEngineModal()}
+    ${renderGitLogModal()}
+    ${renderBuildModal()}
+    ${renderDotenvModal()}
+    ${renderRuntimeLogsModal()}
+  `;
+
+  attachModalEventListeners();
+}
+
+function render(animateModal = false) {
+  renderView();
+  renderModals(animateModal);
 }
 
 // -------------------------------------------------------------
@@ -458,11 +499,11 @@ function renderDashboardView(isReady: boolean): string {
       <h3 class="section-title">${t('projectListHeader')}</h3>
       <div class="section-header-actions">
         ${onlineCount > 0
-          ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
+      ? `<button class="btn-stop-all-pill" id="btn-stop-all" ${state.isStopAllLoading ? 'disabled' : ''}>
               ${state.isStopAllLoading ? t('stoppingAll') : '⏹ ' + t('stopAllBtn')}
              </button>`
-          : ''
-        }
+      : ''
+    }
         <button class="pill-icon-btn primary" id="btn-create-project-header">
           ${t('newProjectBtn')}
         </button>
@@ -561,7 +602,7 @@ function renderProjectCard(p: Project): string {
            ${isBuildingThis ? t('buildingBtn') : t('buildBtn')}
          </button>
          ${pm2?.status === 'online'
-           ? `
+        ? `
               <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
                 ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
               </button>
@@ -569,8 +610,8 @@ function renderProjectCard(p: Project): string {
                 ${isPm2Busy ? t('stoppingBtn') : t('stopBtn')}
               </button>
              `
-           : pm2?.status === 'errored'
-             ? `
+        : pm2?.status === 'errored'
+          ? `
                 <button class="proj-action-btn restart btn-restart-project" data-id="${p.id}" ${isPm2Busy ? 'disabled' : ''}>
                   ${isPm2Busy ? t('restartingBtn') : t('restartBtn')}
                 </button>
@@ -578,12 +619,12 @@ function renderProjectCard(p: Project): string {
                   ${isPm2Busy ? t('stoppingBtn') : t('stopBtn')}
                 </button>
                `
-             : `
+          : `
                 <button class="proj-action-btn start btn-start-project" data-id="${p.id}" ${p.last_build_ok !== true || isPm2Busy ? 'disabled' : ''} title="${p.last_build_ok !== true ? t('deployRequiresBuild') : ''}">
                   ${isPm2Busy ? t('startingBtn') : t('deployBtn')}
                 </button>
                `
-         }
+      }
         `
     }
       </div>
@@ -611,22 +652,22 @@ function renderProjectCard(p: Project): string {
       )
     }
         ${pm2?.status === 'online'
-          ? `<span class="meta-badge status-online btn-open-runtime-log-badge" data-id="${p.id}" style="cursor: pointer;" title="${t('viewRuntimeLogsBtn')}">
+      ? `<span class="meta-badge status-online btn-open-runtime-log-badge" data-id="${p.id}" style="cursor: pointer;" title="${t('viewRuntimeLogsBtn')}">
                <span class="meta-dot pulse-online"></span>
                ${t('statusOnline')}
              </span>`
-          : pm2?.status === 'errored'
-            ? `<span class="meta-badge status-errored">
+      : pm2?.status === 'errored'
+        ? `<span class="meta-badge status-errored">
                  <span class="meta-dot" style="background: #ef4444;"></span>
                  ${t('statusErrored')} (${pm2.restarts}x)
                </span>`
-            : pm2?.status === 'stopped'
-              ? `<span class="meta-badge status-stopped">${t('statusStopped')}</span>`
-              : (isCloned && p.last_build_ok !== true
-                ? `<span class="meta-badge status-need-build">${t('statusNeedBuild')}</span>`
-                : ''
-              )
-        }
+        : pm2?.status === 'stopped'
+          ? `<span class="meta-badge status-stopped">${t('statusStopped')}</span>`
+          : (isCloned && p.last_build_ok !== true
+            ? `<span class="meta-badge status-need-build">${t('statusNeedBuild')}</span>`
+            : ''
+          )
+    }
         <span class="meta-badge">
           <svg class="meta-svg" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="6" y1="3" x2="6" y2="15"></line>
@@ -665,7 +706,7 @@ function renderProjectCard(p: Project): string {
       </div>
 
       ${pm2?.status === 'online'
-        ? `
+      ? `
            <div class="project-runtime-metrics">
              <div class="runtime-metric-item">
                <span class="lbl">${t('detectedPort')}</span>
@@ -689,8 +730,8 @@ function renderProjectCard(p: Project): string {
              </div>
            </div>
           `
-        : ''
-      }
+      : ''
+    }
 
       <div class="project-repo-line">
         <svg class="meta-svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
@@ -897,7 +938,7 @@ function renderFormModal(): string {
   const d = modal.data;
 
   return `
-    <div class="modal-overlay" id="form-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="form-modal-overlay">
       <div class="modal-sheet">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1037,7 +1078,7 @@ function renderDotenvModal(): string {
   if (!modal.isOpen) return '';
 
   return `
-    <div class="modal-overlay" id="dotenv-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="dotenv-modal-overlay">
       <div class="modal-sheet" style="height: 80%; max-height: 80%;">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1075,7 +1116,7 @@ function renderRuntimeLogsModal(): string {
   const isOnline = pm2?.status === 'online';
 
   return `
-    <div class="modal-overlay" id="runtime-logs-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="runtime-logs-modal-overlay">
       <div class="modal-sheet runtime-logs-sheet">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1128,7 +1169,10 @@ function renderRuntimeLogsModal(): string {
           <!-- Terminal Box -->
           <div class="engine-logs-section" style="margin-top: 4px;">
             <div class="engine-logs-box runtime-terminal-box" id="runtime-logs-content">
-              ${getRuntimeLogsHtml()}
+              ${modal.logs.length === 0
+      ? `<div class="log-line muted">${t('noRuntimeLogsYet')}</div>`
+      : ''
+    }
             </div>
           </div>
         </div>
@@ -1151,7 +1195,7 @@ function renderDeleteModal(): string {
   if (!modal.isOpen || !modal.project) return '';
 
   return `
-    <div class="modal-overlay dialog" id="delete-modal-overlay">
+    <div class="modal-overlay dialog ${state.modalAnimateIn ? 'animate-in' : ''}" id="delete-modal-overlay">
       <div class="delete-confirm-box" style="width: 90%; max-width: 400px; margin: auto;">
         <div class="overview-title-group">
           <h2>${t('modalDeleteTitle')}</h2>
@@ -1195,7 +1239,7 @@ function renderEngineModal(): string {
   const diskUsed = vRes?.disk_used_mb ? `${vRes.disk_used_mb} MB` : isReady ? '~343 MB' : '-';
 
   return `
-    <div class="modal-overlay" id="engine-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="engine-modal-overlay">
       <div class="modal-sheet">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1312,7 +1356,7 @@ function renderGitLogModal(): string {
   if (!modal.isOpen) return '';
 
   return `
-    <div class="modal-overlay" id="git-log-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="git-log-modal-overlay">
       <div class="modal-sheet">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1381,7 +1425,7 @@ function renderBuildModal(): string {
   }
 
   return `
-    <div class="modal-overlay" id="build-modal-overlay">
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}" id="build-modal-overlay">
       <div class="modal-sheet">
         <div class="sheet-handle-bar"></div>
         <div class="modal-header">
@@ -1411,13 +1455,13 @@ function renderBuildModal(): string {
             <div style="display: flex; align-items: center; gap: 8px;">
               <span class="status-badge ${badgeCls}">${badgeText}</span>
               ${isBuilding
-                ? `<button class="btn-cancel-build" id="btn-cancel-build-action" ${modal.isCancelling ? 'disabled' : ''}>
+      ? `<button class="btn-cancel-build" id="btn-cancel-build-action" ${modal.isCancelling ? 'disabled' : ''}>
                      ${modal.isCancelling ? t('cancellingBuild') : t('cancelBuildBtn')}
                    </button>`
-                : `<button class="btn-rebuild" id="btn-rebuild-modal" data-id="${modal.projectId || ''}">
+      : `<button class="btn-rebuild" id="btn-rebuild-modal" data-id="${modal.projectId || ''}">
                      ${t('rebuildBtn')}
                    </button>`
-              }
+    }
             </div>
           </div>
 
@@ -1440,16 +1484,16 @@ function renderBuildModal(): string {
             </div>
             <div class="engine-logs-box" id="build-logs-content" style="min-height: 220px; max-height: 340px;">
               ${modal.logs.length > 0
-                ? modal.logs.map((line) => {
-                    let cls = 'step';
-                    if (line.includes('==> Memulai') || line.includes('Perintah:') || line.includes('npm')) cls = 'step';
-                    else if (line.includes('BERHASIL') || line.includes('added ') || line.includes('audited ') || line.includes('found 0 vulnerabilities')) cls = 'success';
-                    else if (line.includes('WARN') || line.includes('deprecated') || line.includes('npm notice')) cls = 'warn';
-                    else if (line.includes('GAGAL') || line.includes('ERR!') || line.includes('error') || line.includes('fatal')) cls = 'error';
-                    return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
-                  }).join('')
-                : `<div class="log-line muted">Menunggu instruksi build...</div>`
-              }
+      ? modal.logs.map((line) => {
+        let cls = 'step';
+        if (line.includes('==> Memulai') || line.includes('Perintah:') || line.includes('npm')) cls = 'step';
+        else if (line.includes('BERHASIL') || line.includes('added ') || line.includes('audited ') || line.includes('found 0 vulnerabilities')) cls = 'success';
+        else if (line.includes('WARN') || line.includes('deprecated') || line.includes('npm notice')) cls = 'warn';
+        else if (line.includes('GAGAL') || line.includes('ERR!') || line.includes('error') || line.includes('fatal')) cls = 'error';
+        return `<div class="log-line ${cls}">${escapeHtml(line)}</div>`;
+      }).join('')
+      : `<div class="log-line muted">Menunggu instruksi build...</div>`
+    }
             </div>
           </div>
         </div>
@@ -1465,39 +1509,39 @@ function renderBuildModal(): string {
 }
 
 // -------------------------------------------------------------
-// EVENT LISTENERS & USER ACTIONS
+// EVENT LISTENERS: VIEW (MAIN CONTAINER)
 // -------------------------------------------------------------
-function attachEventListeners() {
+function attachViewEventListeners() {
   // Navigation
   document.getElementById('btn-open-settings')?.addEventListener('click', () => {
     state.activeTab = state.activeTab === 'settings' ? 'dashboard' : 'settings';
-    render();
+    renderView();
   });
 
   document.getElementById('btn-open-diagnostics')?.addEventListener('click', () => {
     state.activeTab = state.activeTab === 'diagnostics' ? 'dashboard' : 'diagnostics';
-    render();
+    renderView();
   });
 
   document.getElementById('btn-back-from-settings')?.addEventListener('click', () => {
     state.activeTab = 'dashboard';
-    render();
+    renderView();
   });
 
   document.getElementById('btn-back-from-diag')?.addEventListener('click', () => {
     state.activeTab = 'dashboard';
-    render();
+    renderView();
   });
 
   document.getElementById('btn-diag-shortcut')?.addEventListener('click', () => {
     state.activeTab = 'diagnostics';
-    render();
+    renderView();
   });
 
   // Language buttons
   document.getElementById('btn-set-lang-id')?.addEventListener('click', async () => {
     state.language = 'id';
-    render();
+    renderView();
     try {
       await setSetting('language', 'id');
     } catch (e) {
@@ -1507,7 +1551,7 @@ function attachEventListeners() {
 
   document.getElementById('btn-set-lang-en')?.addEventListener('click', async () => {
     state.language = 'en';
-    render();
+    renderView();
     try {
       await setSetting('language', 'en');
     } catch (e) {
@@ -1527,21 +1571,21 @@ function attachEventListeners() {
 
   document.getElementById('btn-toggle-pat-visibility')?.addEventListener('click', () => {
     state.patSettings.showPat = !state.patSettings.showPat;
-    render();
+    renderView();
   });
 
   document.getElementById('btn-save-pat')?.addEventListener('click', async () => {
     const patVal = state.patSettings.inputPat.trim();
     if (!patVal) {
       state.patSettings.error = 'Masukkan token PAT GitHub';
-      render();
+      renderView();
       return;
     }
 
     state.patSettings.isSaving = true;
     state.patSettings.error = null;
     state.patSettings.successMessage = null;
-    render();
+    renderView();
 
     try {
       await savePat(patVal);
@@ -1552,7 +1596,7 @@ function attachEventListeners() {
       state.patSettings.error = String(err);
     } finally {
       state.patSettings.isSaving = false;
-      render();
+      renderView();
     }
   });
 
@@ -1566,13 +1610,13 @@ function attachEventListeners() {
     } catch (err: any) {
       state.patSettings.error = String(err);
     }
-    render();
+    renderView();
   });
 
   // Diagnostics actions
   document.getElementById('btn-run-probe')?.addEventListener('click', async () => {
     state.probeStatus = 'running';
-    render();
+    renderView();
     try {
       const res = await runProotProbe(state.noSeccomp);
       state.probeResult = res;
@@ -1580,12 +1624,12 @@ function attachEventListeners() {
     } catch (err: any) {
       state.probeStatus = 'failed';
     }
-    render();
+    renderView();
   });
 
   document.getElementById('btn-run-verify')?.addEventListener('click', async () => {
     state.setupStatus = 'verifying';
-    render();
+    renderView();
     try {
       const res = await verifySetup();
       state.setupVerification = res;
@@ -1593,27 +1637,343 @@ function attachEventListeners() {
     } catch (err: any) {
       state.setupStatus = 'error';
     }
-    render();
+    renderView();
   });
 
-  // Engine Modal Handlers
+  // Open Engine Modal
   document.getElementById('card-instant-engine')?.addEventListener('click', () => {
     state.engineModal.isOpen = true;
-    render();
+    renderModals(true);
     setTimeout(() => {
       const logBox = document.getElementById('engine-logs-content');
       if (logBox) logBox.scrollTop = logBox.scrollHeight;
     }, 50);
   });
 
+  // Project Clone action
+  document.querySelectorAll('.btn-clone-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      if (!state.repoStatuses[id]) {
+        state.repoStatuses[id] = { is_cloned: false };
+      }
+      state.repoStatuses[id].isCloning = true;
+
+      state.gitLogModal = {
+        isOpen: true,
+        projectId: id,
+        projectName: proj.name,
+        logs: [],
+        isRunning: true,
+        statusMessage: 'Sedang meng-clone repository...',
+      };
+      renderModals(true);
+
+      try {
+        const repoStatus = await cloneProject(id);
+        state.repoStatuses[id] = {
+          ...repoStatus,
+          isCloning: false,
+        };
+        updateGitModalStatus('Repository berhasil di-clone!', false);
+        renderView();
+      } catch (err: any) {
+        state.repoStatuses[id].isCloning = false;
+        updateGitModalStatus(`Clone gagal: ${String(err)}`, false);
+        appendGitTerminalLog(`[ERROR] ${String(err)}`);
+        renderView();
+      }
+    });
+  });
+
+  // Project Pull action
+  document.querySelectorAll('.btn-pull-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      if (!state.repoStatuses[id]) {
+        state.repoStatuses[id] = { is_cloned: true };
+      }
+      state.repoStatuses[id].isPulling = true;
+
+      state.gitLogModal = {
+        isOpen: true,
+        projectId: id,
+        projectName: proj.name,
+        logs: [],
+        isRunning: true,
+        statusMessage: 'Sedang mengambil pembaruan dari remote...',
+      };
+      renderModals(true);
+
+      try {
+        const pullRes = await pullProject(id);
+        const repoStatus = await getRepoStatus(id);
+        state.repoStatuses[id] = {
+          ...repoStatus,
+          isPulling: false,
+        };
+        updateGitModalStatus(pullRes.summary, false);
+        renderView();
+      } catch (err: any) {
+        state.repoStatuses[id].isPulling = false;
+        updateGitModalStatus(`Pull gagal: ${String(err)}`, false);
+        appendGitTerminalLog(`[ERROR] ${String(err)}`);
+        renderView();
+      }
+    });
+  });
+
+  // Build Project Action
+  document.querySelectorAll('.btn-build-project').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = Number(el.getAttribute('data-id'));
+      startBuildForProject(id);
+    });
+  });
+
+  // Runtime Logs Modal Openers
+  document.querySelectorAll('.btn-view-runtime-log').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      await openRuntimeLogsModal(id);
+    });
+  });
+
+  document.querySelectorAll('.btn-open-runtime-log-badge').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      await openRuntimeLogsModal(id);
+    });
+  });
+
+  // View Build Logs Modal Opener
+  document.querySelectorAll('.btn-view-build-log').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+
+      try {
+        const logsList = await listBuildLogs(id);
+        if (logsList.length === 0) {
+          state.buildModal = {
+            isOpen: true,
+            projectId: id,
+            projectName: proj.name,
+            isBuilding: false,
+            isCancelling: false,
+            logs: ['(Belum ada file log build untuk project ini)'],
+            result: null,
+            statusMessage: 'Belum ada log tersimpan',
+          };
+          renderModals(true);
+          return;
+        }
+
+        const latestFile = logsList[0];
+        const content = await readBuildLog(id, latestFile);
+        const lines = content.split('\n');
+
+        state.buildModal = {
+          isOpen: true,
+          projectId: id,
+          projectName: proj.name,
+          isBuilding: false,
+          isCancelling: false,
+          logs: lines,
+          result: {
+            success: proj.last_build_ok ?? false,
+            elapsedSeconds: 0,
+            logFile: latestFile,
+          },
+          statusMessage: `Menampilkan file log: ${latestFile}`,
+        };
+        renderModals(true);
+      } catch (e: any) {
+        console.error('View build log error:', e);
+      }
+    });
+  });
+
+  // Project Create buttons
+  const openCreateModal = () => {
+    state.formModal = {
+      isOpen: true,
+      mode: 'create',
+      projectId: null,
+      data: { ...defaultFormData, env_vars: [] },
+      isSaving: false,
+      error: null,
+      revealedEnvs: {},
+    };
+    renderModals(true);
+  };
+
+  document.getElementById('btn-create-project-top')?.addEventListener('click', openCreateModal);
+  document.getElementById('btn-create-project-header')?.addEventListener('click', openCreateModal);
+  document.getElementById('btn-create-first-project')?.addEventListener('click', openCreateModal);
+
+  // Project PM2 Actions (Fase 7)
+  document.querySelectorAll('.btn-start-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      if (p.last_build_ok !== true) {
+        alert(t('deployRequiresBuild'));
+        return;
+      }
+      state.pm2Loading[p.name] = true;
+      renderView();
+      try {
+        const res = await startProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-stop-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      state.pm2Loading[p.name] = true;
+      renderView();
+      try {
+        const res = await stopProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.querySelectorAll('.btn-restart-project').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+      state.pm2Loading[p.name] = true;
+      renderView();
+      try {
+        const res = await restartProject(id);
+        state.pm2Statuses[p.name] = res;
+      } catch (err: any) {
+        alert(String(err));
+      } finally {
+        state.pm2Loading[p.name] = false;
+        await refreshPm2Statuses();
+      }
+    });
+  });
+
+  document.getElementById('btn-stop-all')?.addEventListener('click', async (e) => {
+    e.stopPropagation(); // Mencegah membuka engine detail modal
+    state.isStopAllLoading = true;
+    renderView();
+    try {
+      await stopAllProcesses();
+    } catch (err: any) {
+      alert(String(err));
+    } finally {
+      state.isStopAllLoading = false;
+      await refreshPm2Statuses();
+    }
+  });
+
+  // Project Kebab Menu toggle (Ubah & Hapus)
+  document.querySelectorAll('.btn-project-menu').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      state.openProjectMenuId = state.openProjectMenuId === id ? null : id;
+      renderView();
+    });
+  });
+
+  // Project Edit buttons
+  document.querySelectorAll('.btn-edit-project').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      state.formModal = {
+        isOpen: true,
+        mode: 'edit',
+        projectId: p.id,
+        data: {
+          name: p.name,
+          repo_url: p.repo_url,
+          branch: p.branch,
+          port_manual: p.port_manual ? String(p.port_manual) : '',
+          build_cmd: p.build_cmd,
+          start_cmd: p.start_cmd,
+          auto_start: p.auto_start,
+          env_vars: p.env_vars ? p.env_vars.map((ev) => ({ key: ev.key, value: ev.value })) : [],
+        },
+        isSaving: false,
+        error: null,
+        revealedEnvs: {},
+      };
+      renderView();
+      renderModals(true);
+    });
+  });
+
+  // Project Delete buttons
+  document.querySelectorAll('.btn-delete-project').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      state.deleteModal = {
+        isOpen: true,
+        project: p,
+        isDeleting: false,
+        error: null,
+      };
+      renderView();
+      renderModals(true);
+    });
+  });
+}
+
+// -------------------------------------------------------------
+// EVENT LISTENERS: MODALS (ISOLATED MODAL CONTAINER)
+// -------------------------------------------------------------
+function attachModalEventListeners() {
+  // Engine Modal Handlers
   document.getElementById('btn-close-engine-modal')?.addEventListener('click', () => {
     state.engineModal.isOpen = false;
-    render();
+    renderModals(false);
   });
 
   document.getElementById('btn-cancel-engine-modal')?.addEventListener('click', () => {
     state.engineModal.isOpen = false;
-    render();
+    renderModals(false);
   });
 
   document.getElementById('btn-copy-engine-logs')?.addEventListener('click', async () => {
@@ -1633,7 +1993,7 @@ function attachEventListeners() {
   document.getElementById('btn-start-engine-setup')?.addEventListener('click', async () => {
     state.setupStatus = 'extracting';
     addEngineLog('Memulai pemasangan lingkungan server mandiri...');
-    render();
+    renderModals(false);
 
     try {
       const unlisten = await onSetupProgress((p) => {
@@ -1670,7 +2030,8 @@ function attachEventListeners() {
       state.setupError = String(err);
       addEngineLog(`[ERROR] Ekstraksi gagal: ${String(err)}`);
     }
-    render();
+    renderModals(false);
+    renderView();
     const logBox = document.getElementById('engine-logs-content');
     if (logBox) logBox.scrollTop = logBox.scrollHeight;
   });
@@ -1678,7 +2039,7 @@ function attachEventListeners() {
   document.getElementById('btn-reverify-engine')?.addEventListener('click', async () => {
     state.setupStatus = 'verifying';
     addEngineLog('Memeriksa ulang integritas & versi toolchain container...');
-    render();
+    renderModals(false);
 
     try {
       const res = await verifySetup();
@@ -1699,7 +2060,8 @@ function attachEventListeners() {
       state.setupStatus = 'error';
       addEngineLog(`[ERROR] Pemeriksaan gagal: ${String(err)}`);
     }
-    render();
+    renderModals(false);
+    renderView();
     const logBox = document.getElementById('engine-logs-content');
     if (logBox) logBox.scrollTop = logBox.scrollHeight;
   });
@@ -1707,7 +2069,7 @@ function attachEventListeners() {
   // Git Modal Handlers
   const closeGitModal = () => {
     state.gitLogModal.isOpen = false;
-    render();
+    renderModals(false);
   };
   document.getElementById('btn-close-git-modal')?.addEventListener('click', closeGitModal);
   document.getElementById('btn-footer-close-git-modal')?.addEventListener('click', closeGitModal);
@@ -1726,152 +2088,13 @@ function attachEventListeners() {
     }
   });
 
-  // Project Clone action
-  document.querySelectorAll('.btn-clone-project').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const proj = state.projects.find((p) => p.id === id);
-      if (!proj) return;
-
-      if (!state.repoStatuses[id]) {
-        state.repoStatuses[id] = { is_cloned: false };
-      }
-      state.repoStatuses[id].isCloning = true;
-
-      state.gitLogModal = {
-        isOpen: true,
-        projectId: id,
-        projectName: proj.name,
-        logs: [],
-        isRunning: true,
-        statusMessage: 'Sedang meng-clone repository...',
-      };
-      render();
-
-      try {
-        const repoStatus = await cloneProject(id);
-        state.repoStatuses[id] = {
-          ...repoStatus,
-          isCloning: false,
-        };
-        updateGitModalStatus('Repository berhasil di-clone!', false);
-      } catch (err: any) {
-        state.repoStatuses[id].isCloning = false;
-        updateGitModalStatus(`Clone gagal: ${String(err)}`, false);
-        appendGitTerminalLog(`[ERROR] ${String(err)}`);
-      }
-    });
-  });
-
-  // Project Pull action
-  document.querySelectorAll('.btn-pull-project').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const proj = state.projects.find((p) => p.id === id);
-      if (!proj) return;
-
-      if (!state.repoStatuses[id]) {
-        state.repoStatuses[id] = { is_cloned: true };
-      }
-      state.repoStatuses[id].isPulling = true;
-
-      state.gitLogModal = {
-        isOpen: true,
-        projectId: id,
-        projectName: proj.name,
-        logs: [],
-        isRunning: true,
-        statusMessage: 'Sedang mengambil pembaruan dari remote...',
-      };
-      render();
-
-      try {
-        const pullRes = await pullProject(id);
-        const repoStatus = await getRepoStatus(id);
-        state.repoStatuses[id] = {
-          ...repoStatus,
-          isPulling: false,
-        };
-        updateGitModalStatus(pullRes.summary, false);
-      } catch (err: any) {
-        state.repoStatuses[id].isPulling = false;
-        updateGitModalStatus(`Pull gagal: ${String(err)}`, false);
-        appendGitTerminalLog(`[ERROR] ${String(err)}`);
-      }
-    });
-  });
-
-  // -----------------------------------------------------------
-  // FASE 5 BUILD ACTIONS
-  // -----------------------------------------------------------
-  const startBuildForProject = async (id: number) => {
-    const proj = state.projects.find((p) => p.id === id);
-    if (!proj) return;
-
-    state.buildModal = {
-      isOpen: true,
-      projectId: id,
-      projectName: proj.name,
-      isBuilding: true,
-      isCancelling: false,
-      logs: [],
-      result: null,
-      statusMessage: 'Sedang mengeksekusi build di rootfs sandbox...',
-    };
-    render();
-
-    try {
-      const res = await buildProject(id);
-      state.buildModal.result = {
-        success: res.success,
-        exitCode: res.exit_code,
-        elapsedSeconds: res.elapsed_seconds,
-        errorSummary: res.error_summary,
-        logFile: res.log_file,
-      };
-      state.buildModal.isBuilding = false;
-
-      // Update status build project di memori
-      const pIdx = state.projects.findIndex((p) => p.id === id);
-      if (pIdx !== -1) {
-        state.projects[pIdx].last_build_ok = res.success;
-        state.projects[pIdx].last_build_at = new Date().toISOString();
-      }
-
-      const msg = res.success
-        ? `Build berhasil dalam ${res.elapsed_seconds}s!`
-        : `Build gagal (exit code: ${res.exit_code ?? '?'})`;
-      updateBuildModalStatus(msg, false, res.error_summary);
-    } catch (err: any) {
-      state.buildModal.isBuilding = false;
-      const errMsg = String(err);
-      state.buildModal.result = {
-        success: false,
-        exitCode: null,
-        elapsedSeconds: 0,
-        errorSummary: errMsg,
-      };
-      updateBuildModalStatus(`Build error: ${errMsg}`, false, errMsg);
-      appendBuildTerminalLog(`[ERROR] ${errMsg}`);
-    }
-  };
-
-  // Tombol Build pada Project Card
-  document.querySelectorAll('.btn-build-project').forEach((el) => {
-    el.addEventListener('click', () => {
-      const id = Number(el.getAttribute('data-id'));
-      startBuildForProject(id);
-    });
-  });
-
-  // Tombol Build Ulang pada Modal Build
+  // Build Modal Handlers
   document.getElementById('btn-rebuild-modal')?.addEventListener('click', () => {
     if (state.buildModal.projectId) {
       startBuildForProject(state.buildModal.projectId);
     }
   });
 
-  // Tombol Batalkan Build
   document.getElementById('btn-cancel-build-action')?.addEventListener('click', async () => {
     if (!state.buildModal.projectId || !state.buildModal.isBuilding) return;
     state.buildModal.isCancelling = true;
@@ -1884,15 +2107,13 @@ function attachEventListeners() {
     }
   });
 
-  // Modal Build Close Handlers
   const closeBuildModal = () => {
     state.buildModal.isOpen = false;
-    render();
+    renderModals(false);
   };
   document.getElementById('btn-close-build-modal')?.addEventListener('click', closeBuildModal);
   document.getElementById('btn-footer-close-build-modal')?.addEventListener('click', closeBuildModal);
 
-  // Salin Log Build
   document.getElementById('btn-copy-build-logs')?.addEventListener('click', async () => {
     const text = state.buildModal.logs.join('\n');
     try {
@@ -1907,26 +2128,7 @@ function attachEventListeners() {
     }
   });
 
-  // -------------------------------------------------------------
-  // FASE 8: RUNTIME LOG MODAL EVENT HANDLERS
-  // -------------------------------------------------------------
-  document.querySelectorAll('.btn-view-runtime-log').forEach((el) => {
-    el.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      state.openProjectMenuId = null;
-      const id = Number(el.getAttribute('data-id'));
-      await openRuntimeLogsModal(id);
-    });
-  });
-
-  document.querySelectorAll('.btn-open-runtime-log-badge').forEach((el) => {
-    el.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const id = Number(el.getAttribute('data-id'));
-      await openRuntimeLogsModal(id);
-    });
-  });
-
+  // Runtime Logs Modal Handlers
   document.getElementById('btn-close-runtime-logs-modal')?.addEventListener('click', closeRuntimeLogsModal);
   document.getElementById('btn-footer-close-runtime-logs-modal')?.addEventListener('click', closeRuntimeLogsModal);
   document.getElementById('runtime-logs-modal-overlay')?.addEventListener('click', (e) => {
@@ -1935,7 +2137,6 @@ function attachEventListeners() {
     }
   });
 
-  // Filter Stream: Semua | Stdout | Stderr
   document.querySelectorAll('.runtime-filter-btn').forEach((el) => {
     el.addEventListener('click', () => {
       const filter = el.getAttribute('data-filter') as 'all' | 'stdout' | 'stderr';
@@ -1947,7 +2148,6 @@ function attachEventListeners() {
     });
   });
 
-  // Toggle Pause / Resume
   document.getElementById('btn-toggle-pause-logs')?.addEventListener('click', () => {
     state.runtimeLogsModal.isPaused = !state.runtimeLogsModal.isPaused;
     const isPaused = state.runtimeLogsModal.isPaused;
@@ -1962,7 +2162,6 @@ function attachEventListeners() {
     }
   });
 
-  // Toggle Auto-scroll
   document.getElementById('btn-toggle-autoscroll')?.addEventListener('click', () => {
     state.runtimeLogsModal.autoScroll = !state.runtimeLogsModal.autoScroll;
     const autoScroll = state.runtimeLogsModal.autoScroll;
@@ -1976,7 +2175,6 @@ function attachEventListeners() {
     }
   });
 
-  // Copy Runtime Logs
   document.getElementById('btn-copy-runtime-logs')?.addEventListener('click', async () => {
     const curFilter = state.runtimeLogsModal.filter;
     const filtered = state.runtimeLogsModal.logs.filter((item) => {
@@ -1998,7 +2196,6 @@ function attachEventListeners() {
     }
   });
 
-  // Clear Runtime Logs
   document.getElementById('btn-clear-runtime-logs')?.addEventListener('click', () => {
     state.runtimeLogsModal.logs = [];
     const container = document.getElementById('runtime-logs-content');
@@ -2007,244 +2204,16 @@ function attachEventListeners() {
     }
   });
 
-  // Klik Badge Build untuk membuka Log Viewer
-  document.querySelectorAll('.btn-view-build-log').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const proj = state.projects.find((p) => p.id === id);
-      if (!proj) return;
-
-      try {
-        const logsList = await listBuildLogs(id);
-        if (logsList.length === 0) {
-          state.buildModal = {
-            isOpen: true,
-            projectId: id,
-            projectName: proj.name,
-            isBuilding: false,
-            isCancelling: false,
-            logs: ['(Belum ada file log build untuk project ini)'],
-            result: null,
-            statusMessage: 'Belum ada log tersimpan',
-          };
-          render();
-          return;
-        }
-
-        const latestFile = logsList[0];
-        const content = await readBuildLog(id, latestFile);
-        const lines = content.split('\n');
-
-        state.buildModal = {
-          isOpen: true,
-          projectId: id,
-          projectName: proj.name,
-          isBuilding: false,
-          isCancelling: false,
-          logs: lines,
-          result: {
-            success: proj.last_build_ok ?? false,
-            elapsedSeconds: 0,
-            logFile: latestFile,
-          },
-          statusMessage: `Menampilkan file log: ${latestFile}`,
-        };
-        render();
-      } catch (e: any) {
-        console.error('View build log error:', e);
-      }
-    });
-  });
-
-  // Project Create buttons
-  const openCreateModal = () => {
-    state.formModal = {
-      isOpen: true,
-      mode: 'create',
-      projectId: null,
-      data: { ...defaultFormData, env_vars: [] },
-      isSaving: false,
-      error: null,
-      revealedEnvs: {},
-    };
-    render();
-  };
-
-  document.getElementById('btn-create-project-top')?.addEventListener('click', openCreateModal);
-  document.getElementById('btn-create-project-header')?.addEventListener('click', openCreateModal);
-  document.getElementById('btn-create-first-project')?.addEventListener('click', openCreateModal);
-
-  // Close Form Modal
+  // Form Modal Handlers
   document.getElementById('btn-close-form-modal')?.addEventListener('click', () => {
     state.formModal.isOpen = false;
-    render();
+    renderModals(false);
   });
   document.getElementById('btn-cancel-form-modal')?.addEventListener('click', () => {
     state.formModal.isOpen = false;
-    render();
+    renderModals(false);
   });
 
-  // Project PM2 Actions (Fase 7)
-  document.querySelectorAll('.btn-start-project').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const p = state.projects.find((proj) => proj.id === id);
-      if (!p) return;
-      if (p.last_build_ok !== true) {
-        alert(t('deployRequiresBuild'));
-        return;
-      }
-      state.pm2Loading[p.name] = true;
-      render();
-      try {
-        const res = await startProject(id);
-        state.pm2Statuses[p.name] = res;
-      } catch (err: any) {
-        alert(String(err));
-      } finally {
-        state.pm2Loading[p.name] = false;
-        await refreshPm2Statuses();
-      }
-    });
-  });
-
-  document.querySelectorAll('.btn-stop-project').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const p = state.projects.find((proj) => proj.id === id);
-      if (!p) return;
-      state.pm2Loading[p.name] = true;
-      render();
-      try {
-        const res = await stopProject(id);
-        state.pm2Statuses[p.name] = res;
-      } catch (err: any) {
-        alert(String(err));
-      } finally {
-        state.pm2Loading[p.name] = false;
-        await refreshPm2Statuses();
-      }
-    });
-  });
-
-  document.querySelectorAll('.btn-restart-project').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const id = Number(el.getAttribute('data-id'));
-      const p = state.projects.find((proj) => proj.id === id);
-      if (!p) return;
-      state.pm2Loading[p.name] = true;
-      render();
-      try {
-        const res = await restartProject(id);
-        state.pm2Statuses[p.name] = res;
-      } catch (err: any) {
-        alert(String(err));
-      } finally {
-        state.pm2Loading[p.name] = false;
-        await refreshPm2Statuses();
-      }
-    });
-  });
-
-  document.getElementById('btn-stop-all')?.addEventListener('click', async (e) => {
-    e.stopPropagation(); // Mencegah membuka engine detail modal
-    state.isStopAllLoading = true;
-    render();
-    try {
-      await stopAllProcesses();
-    } catch (err: any) {
-      alert(String(err));
-    } finally {
-      state.isStopAllLoading = false;
-      await refreshPm2Statuses();
-    }
-  });
-
-  // Project Kebab Menu toggle (Ubah & Hapus)
-  document.querySelectorAll('.btn-project-menu').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const id = Number(el.getAttribute('data-id'));
-      state.openProjectMenuId = state.openProjectMenuId === id ? null : id;
-      render();
-    });
-  });
-
-  // Project Edit buttons
-  document.querySelectorAll('.btn-edit-project').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      state.openProjectMenuId = null;
-      const id = Number(el.getAttribute('data-id'));
-      const p = state.projects.find((proj) => proj.id === id);
-      if (!p) return;
-
-      state.formModal = {
-        isOpen: true,
-        mode: 'edit',
-        projectId: p.id,
-        data: {
-          name: p.name,
-          repo_url: p.repo_url,
-          branch: p.branch,
-          port_manual: p.port_manual ? String(p.port_manual) : '',
-          build_cmd: p.build_cmd,
-          start_cmd: p.start_cmd,
-          auto_start: p.auto_start,
-          env_vars: p.env_vars ? p.env_vars.map((ev) => ({ key: ev.key, value: ev.value })) : [],
-        },
-        isSaving: false,
-        error: null,
-        revealedEnvs: {},
-      };
-      render();
-    });
-  });
-
-  // Project Delete buttons
-  document.querySelectorAll('.btn-delete-project').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      state.openProjectMenuId = null;
-      const id = Number(el.getAttribute('data-id'));
-      const p = state.projects.find((proj) => proj.id === id);
-      if (!p) return;
-
-      state.deleteModal = {
-        isOpen: true,
-        project: p,
-        isDeleting: false,
-        error: null,
-      };
-      render();
-    });
-  });
-
-  // Delete modal cancel & confirm
-  document.getElementById('btn-cancel-delete')?.addEventListener('click', () => {
-    state.deleteModal.isOpen = false;
-    render();
-  });
-
-  document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
-    if (!state.deleteModal.project) return;
-    state.deleteModal.isDeleting = true;
-    render();
-
-    try {
-      await deletePm2Process(state.deleteModal.project.id);
-      await deleteProject(state.deleteModal.project.id);
-      state.deleteModal.isOpen = false;
-      await loadProjects();
-      await refreshPm2Statuses();
-    } catch (err: any) {
-      state.deleteModal.isDeleting = false;
-      state.deleteModal.error = String(err);
-      render();
-    }
-  });
-
-  // Form Modal inputs change sync
   const inputName = document.getElementById('input-project-name') as HTMLInputElement | null;
   const inputRepo = document.getElementById('input-repo-url') as HTMLInputElement | null;
   const inputBranch = document.getElementById('input-branch') as HTMLInputElement | null;
@@ -2278,32 +2247,32 @@ function attachEventListeners() {
   // Add Env Row
   document.getElementById('btn-add-env-row')?.addEventListener('click', () => {
     state.formModal.data.env_vars.push({ key: '', value: '' });
-    render();
+    renderModals(false);
   });
 
-  // Toggle Eye for Env Values (Fase 6)
+  // Toggle Eye for Env Values
   document.querySelectorAll('.btn-toggle-eye').forEach((el) => {
     el.addEventListener('click', () => {
       const idx = Number(el.getAttribute('data-index'));
       state.formModal.revealedEnvs[idx] = !state.formModal.revealedEnvs[idx];
-      render();
+      renderModals(false);
     });
   });
 
-  // Open Dotenv Import Modal (Fase 6)
+  // Open Dotenv Import Modal
   document.getElementById('btn-import-dotenv')?.addEventListener('click', () => {
     state.dotenvModal = {
       isOpen: true,
       text: '',
       error: null,
     };
-    render();
+    renderModals(false);
   });
 
   // Close Dotenv Modal
   const closeDotenv = () => {
     state.dotenvModal.isOpen = false;
-    render();
+    renderModals(false);
   };
   document.getElementById('btn-close-dotenv-modal')?.addEventListener('click', closeDotenv);
   document.getElementById('btn-cancel-dotenv-modal')?.addEventListener('click', closeDotenv);
@@ -2311,13 +2280,13 @@ function attachEventListeners() {
     if (e.target === e.currentTarget) closeDotenv();
   });
 
-  // Process & Import Dotenv (Fase 6)
+  // Process & Import Dotenv
   document.getElementById('btn-process-dotenv')?.addEventListener('click', () => {
     const textarea = document.getElementById('textarea-dotenv-content') as HTMLTextAreaElement | null;
     const text = textarea?.value ?? '';
     if (!text.trim()) {
       state.dotenvModal.error = 'Konten .env tidak boleh kosong';
-      render();
+      renderModals(false);
       return;
     }
 
@@ -2331,7 +2300,6 @@ function attachEventListeners() {
       if (eqIdx <= 0) continue;
       const key = cleanLine.slice(0, eqIdx).trim();
       let val = cleanLine.slice(eqIdx + 1).trim();
-      // unquote
       if (
         (val.startsWith('"') && val.endsWith('"') && val.length >= 2) ||
         (val.startsWith("'") && val.endsWith("'") && val.length >= 2)
@@ -2348,11 +2316,10 @@ function attachEventListeners() {
 
     if (parsed.length === 0) {
       state.dotenvModal.error = 'Tidak ada variabel valid yang ditemukan (format harus KEY=VALUE)';
-      render();
+      renderModals(false);
       return;
     }
 
-    // Gabungkan variabel: ganti yang duplikat, tambahkan yang baru
     const existingMap = new Map<string, string>();
     for (const ev of state.formModal.data.env_vars) {
       if (ev.key.trim()) existingMap.set(ev.key.trim(), ev.value);
@@ -2366,7 +2333,7 @@ function attachEventListeners() {
       value,
     }));
     state.dotenvModal.isOpen = false;
-    render();
+    renderModals(false);
   });
 
   // Remove Env Row
@@ -2374,7 +2341,7 @@ function attachEventListeners() {
     el.addEventListener('click', () => {
       const idx = Number(el.getAttribute('data-index'));
       state.formModal.data.env_vars.splice(idx, 1);
-      render();
+      renderModals(false);
     });
   });
 
@@ -2386,19 +2353,19 @@ function attachEventListeners() {
 
     if (!name) {
       state.formModal.error = 'Nama project tidak boleh kosong';
-      render();
+      renderModals(false);
       return;
     }
 
     if (!repo_url) {
       state.formModal.error = 'Repository URL tidak boleh kosong';
-      render();
+      renderModals(false);
       return;
     }
 
     state.formModal.isSaving = true;
     state.formModal.error = null;
-    render();
+    renderModals(false);
 
     try {
       const portNum = d.port_manual.trim() ? Number(d.port_manual.trim()) : null;
@@ -2428,13 +2395,94 @@ function attachEventListeners() {
       }
 
       state.formModal.isOpen = false;
+      renderModals(false);
       await loadProjects();
     } catch (err: any) {
       state.formModal.isSaving = false;
       state.formModal.error = String(err);
-      render();
+      renderModals(false);
     }
   });
+
+  // Delete modal cancel & confirm
+  document.getElementById('btn-cancel-delete')?.addEventListener('click', () => {
+    state.deleteModal.isOpen = false;
+    renderModals(false);
+  });
+
+  document.getElementById('btn-confirm-delete')?.addEventListener('click', async () => {
+    if (!state.deleteModal.project) return;
+    state.deleteModal.isDeleting = true;
+    renderModals(false);
+
+    try {
+      await deletePm2Process(state.deleteModal.project.id);
+      await deleteProject(state.deleteModal.project.id);
+      state.deleteModal.isOpen = false;
+      renderModals(false);
+      await loadProjects();
+      await refreshPm2Statuses();
+    } catch (err: any) {
+      state.deleteModal.isDeleting = false;
+      state.deleteModal.error = String(err);
+      renderModals(false);
+    }
+  });
+}
+
+// Helper untuk aksi build
+async function startBuildForProject(id: number) {
+  const proj = state.projects.find((p) => p.id === id);
+  if (!proj) return;
+
+  state.buildModal = {
+    isOpen: true,
+    projectId: id,
+    projectName: proj.name,
+    isBuilding: true,
+    isCancelling: false,
+    logs: [],
+    result: null,
+    statusMessage: 'Sedang mengeksekusi build di rootfs sandbox...',
+  };
+  renderModals(true);
+
+  try {
+    const res = await buildProject(id);
+    state.buildModal.result = {
+      success: res.success,
+      exitCode: res.exit_code,
+      elapsedSeconds: res.elapsed_seconds,
+      errorSummary: res.error_summary,
+      logFile: res.log_file,
+    };
+    state.buildModal.isBuilding = false;
+
+    // Update status build project di memori
+    const pIdx = state.projects.findIndex((p) => p.id === id);
+    if (pIdx !== -1) {
+      state.projects[pIdx].last_build_ok = res.success;
+      state.projects[pIdx].last_build_at = new Date().toISOString();
+    }
+
+    const msg = res.success
+      ? `Build berhasil dalam ${res.elapsed_seconds}s!`
+      : `Build gagal (exit code: ${res.exit_code ?? '?'})`;
+    updateBuildModalStatus(msg, false, res.error_summary);
+    renderView();
+  } catch (err: any) {
+    state.buildModal.isBuilding = false;
+    const errMsg = String(err);
+    state.buildModal.result = {
+      success: false,
+      exitCode: null,
+      elapsedSeconds: 0,
+      errorSummary: errMsg,
+    };
+    updateBuildModalStatus(`Build error: ${errMsg}`, false, errMsg);
+    appendBuildTerminalLog(`[ERROR] ${errMsg}`);
+    renderView();
+  }
 }
 
 // -------------------------------------------------------------
@@ -2453,7 +2501,11 @@ async function loadRepoStatuses(projects: Project[]) {
       console.warn(`Failed to get repo status for ${p.name}:`, e);
     }
   }
-  render();
+  if (isAnyModalOpen()) {
+    renderView();
+  } else {
+    render();
+  }
 }
 
 async function loadProjects() {
@@ -2462,14 +2514,22 @@ async function loadProjects() {
     const list = await listProjects();
     state.projects = list;
     state.projectsError = null;
-    render();
+    if (isAnyModalOpen()) {
+      renderView();
+    } else {
+      render();
+    }
     // Refresh repo statuses asynchronously
     loadRepoStatuses(list);
   } catch (err: any) {
     state.projectsError = String(err);
   } finally {
     state.isLoadingProjects = false;
-    render();
+    if (isAnyModalOpen()) {
+      renderView();
+    } else {
+      render();
+    }
   }
 }
 
@@ -2483,7 +2543,11 @@ async function refreshPm2Statuses() {
       map[item.name] = item;
     }
     state.pm2Statuses = map;
-    render();
+    if (isAnyModalOpen()) {
+      renderView();
+    } else {
+      render();
+    }
   } catch (e) {
     console.warn('Failed to refresh PM2 statuses:', e);
   }
@@ -2522,7 +2586,7 @@ document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (!target.closest('.project-menu-wrapper')) {
       state.openProjectMenuId = null;
-      render();
+      renderView();
     }
   }
 });
