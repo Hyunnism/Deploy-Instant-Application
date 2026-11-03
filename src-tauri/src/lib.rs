@@ -23,6 +23,19 @@ pub fn run() {
             app.manage(core::project::ActiveBuildManager::new());
             app.manage(core::pm2::create_log_stream_manager());
             app.manage(core::tunnel::TunnelManager::new());
+
+            // Daftarkan global AppHandle untuk JNI lifecycle callbacks
+            core::lifecycle::register_app_handle(app.handle().clone());
+
+            // Bersihkan sisa proses yatim dari sesi sebelumnya jika ada
+            let app_files_dir_clone = app_files_dir.clone();
+            tauri::async_runtime::spawn(async move {
+                let cleaned = core::lifecycle::clean_orphan_processes(&app_files_dir_clone).await;
+                if cleaned > 0 {
+                    eprintln!("[DeployInstant Lifecycle] Membersihkan {} proses yatim saat startup.", cleaned);
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -69,6 +82,10 @@ pub fn run() {
             commands::tunnel::list_active_tunnels,
             commands::tunnel::share_url,
             commands::tunnel::open_external_url,
+            commands::lifecycle::get_battery_status,
+            commands::lifecycle::open_battery_settings,
+            commands::lifecycle::clean_orphans,
+            commands::lifecycle::shutdown_cleanly,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

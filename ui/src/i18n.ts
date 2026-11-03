@@ -93,6 +93,14 @@ export const translations = {
     engineRuntime: 'Engine Runtime',
     zeroLaptopNotice: 'Deploy Instant berjalan 100% mandiri di perangkat lokal Anda tanpa memerlukan laptop.',
     openDiagnostics: 'Buka Diagnostik Sistem',
+
+    // Fase 11: Lifecycle & Baterai
+    batteryCardTitle: 'Ketahanan Latar Belakang & Baterai',
+    batteryCardDesc: 'Agar server PM2 dan Quick Tunnel tetap hidup saat layar mati atau aplikasi diminimalkan, atur optimasi baterai ke "Tidak Ada Batasan" (Unrestricted).',
+    batteryStatusIgnored: 'Tidak Dibatasi (Optimal)',
+    batteryStatusRestricted: 'Dibatasi Sistem (Bisa Mati Saat Layar Mati)',
+    batteryOpenSettingsBtn: 'Buka Pengaturan Baterai',
+    batterySettingsOpened: 'Membuka pengaturan baterai...',
     
     // Diagnostics (Fase 1 & Fase 2)
     diagnosticsTitle: 'Diagnostik Toolchain & Proot',
@@ -289,6 +297,14 @@ export const translations = {
     engineRuntime: 'Engine Runtime',
     zeroLaptopNotice: 'Deploy Instant runs 100% autonomously on your local device without requiring a laptop.',
     openDiagnostics: 'Open System Diagnostics',
+
+    // Fase 11: Lifecycle & Baterai
+    batteryCardTitle: 'Background Resilience & Battery',
+    batteryCardDesc: 'To prevent the system from killing PM2 processes and tunnels when the screen is off, set battery optimization to "Unrestricted".',
+    batteryStatusIgnored: 'Unrestricted (Optimal)',
+    batteryStatusRestricted: 'Restricted (May Sleep When Screen Off)',
+    batteryOpenSettingsBtn: 'Open Battery Settings',
+    batterySettingsOpened: 'Opening battery settings...',
     
     // Diagnostics (Fase 1 & Fase 2)
     diagnosticsTitle: 'Toolchain & Proot Diagnostics',

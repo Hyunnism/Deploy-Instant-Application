@@ -1,12 +1,31 @@
 // commands/pm2.rs
 // Lapisan tipis Tauri Command untuk PM2 Process Management (PRD Bagian 8.3 & 13 Fase 7)
 
+use crate::core::lifecycle::{stop_foreground_service_native, sync_foreground_service_native};
 use crate::core::tunnel::TunnelManager;
 use crate::core::{pm2, rootfs};
 use crate::models::Pm2Status;
 use crate::storage::db::Database;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
+
+static LAST_SYNCED_ONLINE_COUNT: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// Helper untuk menyinkronkan status Foreground Service Android berdasarkan proses online
+fn sync_service_state(procs: &[Pm2Status]) {
+    let online_count = procs.iter().filter(|p| p.status == "online").count() as i32;
+    let prev = LAST_SYNCED_ONLINE_COUNT.swap(online_count, std::sync::atomic::Ordering::Relaxed);
+    if prev == online_count {
+        return; // Tidak ada perubahan status, lewati JNI call untuk zero-overhead
+    }
+
+    if online_count > 0 {
+        let desc = format!("{} project sedang online", online_count);
+        sync_foreground_service_native(online_count, &desc);
+    } else if prev > 0 || prev == -1 {
+        stop_foreground_service_native();
+    }
+}
 
 /// Helper untuk mendapatkan direktori dan binary proot
 fn get_runtime_env(app: &AppHandle) -> Result<(PathBuf, PathBuf, PathBuf), String> {
@@ -55,7 +74,7 @@ pub async fn pm2_start(app: AppHandle, project_id: i64) -> Result<Pm2Status, Str
 
     let active_ports = get_active_project_ports(&proot_bin, &rootfs_dir, &tmp_dir).await;
 
-    pm2::start_project(
+    let res = pm2::start_project(
         &project,
         &env_vars,
         &active_ports,
@@ -65,7 +84,13 @@ pub async fn pm2_start(app: AppHandle, project_id: i64) -> Result<Pm2Status, Str
         false,
     )
     .await
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+
+    if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        sync_service_state(&procs);
+    }
+
+    Ok(res)
 }
 
 #[tauri::command]
@@ -80,9 +105,15 @@ pub async fn pm2_stop(app: AppHandle, project_id: i64) -> Result<Pm2Status, Stri
 
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
-    pm2::stop_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
+    let res = pm2::stop_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        sync_service_state(&procs);
+    }
+
+    Ok(res)
 }
 
 #[tauri::command]
@@ -92,9 +123,19 @@ pub async fn pm2_restart(app: AppHandle, project_id: i64) -> Result<Pm2Status, S
 
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
-    pm2::restart_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
-        .await
-        .map_err(|e| e.to_string())
+    let res = match pm2::restart_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        Ok(s) => s,
+        Err(_) => {
+            // Fallback: Jika proses belum terdaftar di PM2 (misal setelah kill daemon), mulai ulang dengan start_project
+            return pm2_start(app, project_id).await;
+        }
+    };
+
+    if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        sync_service_state(&procs);
+    }
+
+    Ok(res)
 }
 
 #[tauri::command]
@@ -111,16 +152,25 @@ pub async fn pm2_delete(app: AppHandle, project_id: i64) -> Result<(), String> {
 
     pm2::delete_process(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        sync_service_state(&procs);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn pm2_list(app: AppHandle) -> Result<Vec<Pm2Status>, String> {
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
-    pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false)
+    let procs = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+
+    sync_service_state(&procs);
+    Ok(procs)
 }
 
 #[tauri::command]
@@ -132,9 +182,12 @@ pub async fn pm2_stop_all(app: AppHandle) -> Result<(), String> {
 
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
-    pm2::stop_all_processes(&proot_bin, &rootfs_dir, &tmp_dir, false)
+    let res = pm2::stop_all_processes(&proot_bin, &rootfs_dir, &tmp_dir, false)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+
+    stop_foreground_service_native();
+    res
 }
 
 #[tauri::command]
@@ -179,6 +232,10 @@ pub async fn pm2_check_autostart(app: AppHandle) -> Result<Vec<Pm2Status>, Strin
                 }
             }
         }
+    }
+
+    if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
+        sync_service_state(&procs);
     }
 
     Ok(started)

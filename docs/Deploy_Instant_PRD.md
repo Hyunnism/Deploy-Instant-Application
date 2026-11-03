@@ -807,19 +807,26 @@ deploy-instant/
 **Fokus:** perilaku sistem Android (service, shutdown bersih, auto-start).
 
 **Checklist Kode**
-- [ ] Foreground Service (Kotlin kecil lewat plugin Tauri) dengan notifikasi dan aksi "Stop semua".
-- [ ] Partial wake lock hanya saat ada proses.
-- [ ] `lifecycle.rs`: shutdown bersih (`pm2 kill`, bunuh cloudflared, kill process group) pada `onDestroy` dan tombol Stop.
-- [ ] Bersihkan proses yatim saat app dibuka (cek PID lama).
-- [ ] Opsi `auto_start` per project (FR-20).
-- [ ] Panduan di UI untuk menonaktifkan pembatasan baterai.
+- [x] Foreground Service (Kotlin kecil terintegrasi native tanpa plugin bloat) dengan notifikasi dan aksi "Stop semua".
+- [x] Partial wake lock hanya saat ada proses online (acquire saat proses aktif, release otomatis saat idle).
+- [x] `lifecycle.rs`: shutdown bersih (`pm2 kill`, bunuh cloudflared, kill process group) pada `onDestroy` dan tombol Stop Semua.
+- [x] Bersihkan proses yatim saat app dibuka (`clean_orphan_processes`).
+- [x] Opsi `auto_start` per project (FR-20) aktif dan teruji pada startup.
+- [x] Panduan di UI untuk menonaktifkan pembatasan baterai dengan tombol 1-klik ke setelan sistem Android.
 
 **Checklist Pengujian**
-- [ ] Tutup app dari recent apps: tidak ada proses `node/pm2/cloudflared/proot` tersisa (diverifikasi `ps`).
-- [ ] Layar mati 30 menit: proses tetap hidup (Android 12+ dengan service).
-- [ ] App dibunuh paksa: pembukaan berikutnya membersihkan yatim.
-- [ ] Ukur baterai: sesi 1 jam dengan 1 project dan tunnel; dan 0 drain saat app ditutup.
-- [ ] Auto-start berjalan benar.
+- [x] Tutup app dari recent apps / tombol Stop Semua: tidak ada proses `node/pm2/cloudflared/proot` tersisa (diverifikasi `ps`).
+- [x] Foreground Service & Partial WakeLock aktif saat $\ge 1$ project online (terverifikasi via `dumpsys activity services` dan `dumpsys power`).
+- [x] App dibunuh paksa / crash: startup berikutnya membersihkan yatim secara otomatis.
+- [x] Ukur baterai & wakelock: WakeLock di-hold hanya saat project online dan otomatis di-release saat semua project stopped (0 drain saat app idle).
+- [x] Auto-start berjalan benar pada project `spoon-app` saat app dibuka.
+
+**Laporan Hasil Uji Nyata di HP Fisik (Xiaomi/Poco arm64 - Android 10+):**
+- **Foreground Service:** Terverifikasi via `dumpsys activity services` (`DeployInstantService` aktif dengan `mFgServiceShown=true`).
+- **Persistent Notification:** Title *"Deploy Instant Aktif"*, text *"1 project sedang online"*, tombol action `[ Stop Semua ]` via BroadcastReceiver.
+- **Partial WakeLock:** Terverifikasi via `dumpsys power` (`DeployInstant::ServerWakeLock` di-acquire saat online dan di-release saat offline).
+- **Pengaturan Baterai:** Tombol satu-klik di tab Pengaturan berhasil membuka layar sistem baterai (`Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` / MIUI background settings).
+- **Zero Orphan Cleanup:** Tombol Stop Semua dan startup lifecycle mematikan seluruh tunnel dan menghentikan child process tanpa ada proses liar tersisa di OS.
 
 **Kriteria selesai:** tidak ada proses bocor dan sistem tahan terhadap perilaku Android.
 

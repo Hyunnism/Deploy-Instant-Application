@@ -602,6 +602,28 @@ pub async fn stop_all_processes(
     Ok(())
 }
 
+/// Mematikan daemon PM2 secara tuntas (`pm2 kill`) (PRD Bagian 8.8 Fase 11)
+pub async fn kill_pm2_daemon(
+    proot_bin: &Path,
+    rootfs_dir: &Path,
+    tmp_dir: &Path,
+    no_seccomp: bool,
+) -> Result<()> {
+    let mut cmd = proot_exec(
+        proot_bin,
+        rootfs_dir,
+        tmp_dir,
+        "/",
+        "pm2 kill",
+        &[],
+        no_seccomp,
+        true,
+    );
+
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), cmd.output()).await;
+    Ok(())
+}
+
 /// Memulai streaming realtime runtime log PM2 (`pm2 logs <name> --raw --lines 200`) ke UI
 #[allow(clippy::too_many_arguments)]
 pub async fn start_runtime_log_stream(

@@ -155,6 +155,9 @@ export interface AppState {
     projectId: number | null;
     projectName: string;
   };
+
+  // Fase 11 Lifecycle & Battery State
+  batteryIgnored: boolean;
 }
 
 export interface RuntimeLogItem {
@@ -280,4 +283,7 @@ export const state: AppState = {
     projectId: null,
     projectName: '',
   },
+
+  // Fase 11
+  batteryIgnored: false,
 };

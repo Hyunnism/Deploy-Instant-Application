@@ -374,6 +374,23 @@ export async function onTunnelStatus(
   return await listen<ProjectTunnelInfo>('tunnel:status', (e) => callback(e.payload));
 }
 
+// Fase 11: Lifecycle, Baterai, & Ketahanan
+export async function getBatteryStatus(): Promise<boolean> {
+  return await invoke<boolean>('get_battery_status');
+}
+
+export async function openBatterySettings(): Promise<void> {
+  return await invoke<void>('open_battery_settings');
+}
+
+export async function cleanOrphans(): Promise<number> {
+  return await invoke<number>('clean_orphans');
+}
+
+export async function shutdownCleanly(): Promise<void> {
+  return await invoke<void>('shutdown_cleanly');
+}
+
 
 
 

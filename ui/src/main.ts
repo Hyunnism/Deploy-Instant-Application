@@ -7,6 +7,8 @@ import {
   buildProject,
   cancelBuild,
   checkAutoStart,
+  getBatteryStatus,
+  openBatterySettings,
   checkSetupStatus,
   cloneProject,
   createProject,
@@ -882,6 +884,26 @@ function renderSettingsView(): string {
         </p>
       </div>
 
+      <!-- Fase 11: Background Resilience & Battery Optimization -->
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('batteryCardTitle')}</h2>
+          <div class="overview-subtitle">
+            <span class="status-badge ${state.batteryIgnored ? 'healthy' : 'warning'}" style="margin-top: 4px; display: inline-flex;">
+              ${state.batteryIgnored ? t('batteryStatusIgnored') : t('batteryStatusRestricted')}
+            </span>
+          </div>
+        </div>
+        <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-top: 4px;">
+          ${t('batteryCardDesc')}
+        </p>
+        <div style="margin-top: 10px;">
+          <button class="modal-btn secondary" id="btn-open-battery-settings" style="width: 100%; justify-content: center; height: 38px;">
+            ${t('batteryOpenSettingsBtn')}
+          </button>
+        </div>
+      </div>
+
       <!-- Language Section -->
       <div class="settings-card">
         <div class="overview-title-group">
@@ -1670,6 +1692,22 @@ function attachViewEventListeners() {
   document.getElementById('btn-diag-shortcut')?.addEventListener('click', () => {
     state.activeTab = 'diagnostics';
     renderView();
+  });
+
+  // Fase 11: Battery Optimization Button
+  document.getElementById('btn-open-battery-settings')?.addEventListener('click', async () => {
+    try {
+      await openBatterySettings();
+      // Tunggu user kembali lalu update status
+      setTimeout(async () => {
+        try {
+          state.batteryIgnored = await getBatteryStatus();
+          renderView();
+        } catch (_) {}
+      }, 1000);
+    } catch (e) {
+      console.error(e);
+    }
   });
 
   // Language buttons
@@ -2961,6 +2999,13 @@ async function init() {
     state.setupInfo = status;
   } catch (e) {
     console.error('Failed to check setup status:', e);
+  }
+
+  // Load battery optimization status (Fase 11)
+  try {
+    state.batteryIgnored = await getBatteryStatus();
+  } catch (e) {
+    console.warn('Failed to get battery status:', e);
   }
 
   // Load projects
