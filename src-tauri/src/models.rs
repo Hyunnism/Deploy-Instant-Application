@@ -173,3 +173,23 @@ pub struct RuntimeLogEvent {
     pub stream: String, // "stdout" | "stderr"
     pub timestamp: u64,
 }
+
+/// Status Quick Tunnel Cloudflare (PRD Bagian 13 Fase 10)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TunnelStatus {
+    Stopped,
+    Starting,
+    Active,
+    Error,
+}
+
+/// Informasi Quick Tunnel per project (PRD Bagian 13 Fase 10)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectTunnelInfo {
+    pub project_id: i64,
+    pub port: u16,
+    pub url: Option<String>,
+    pub status: TunnelStatus,
+    pub error: Option<String>,
+}

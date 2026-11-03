@@ -184,6 +184,21 @@ export const translations = {
     openLocalBtn: 'Buka',
     openLocalTitle: 'Buka Aplikasi',
     detectedPortLabel: 'Terdeteksi',
+
+    // Fase 10 Cloudflare Quick Tunnel
+    shareBtn: 'Bagikan',
+    stopShareBtn: 'Stop Bagikan',
+    sharingBtn: 'Menghubungkan...',
+    shareWarningTitle: 'Peringatan Akses Publik',
+    shareWarningBody: 'URL Quick Tunnel ini dapat diakses oleh siapa pun di internet yang memiliki link. Pastikan aplikasi Anda tidak memuat data rahasia atau kunci API pribadi.',
+    shareWarningConfirm: 'Lanjutkan & Bagikan',
+    shareWarningCancel: 'Batal',
+    tunnelActiveTitle: 'Quick Tunnel Publik',
+    tunnelCopyBtn: 'Salin',
+    tunnelCopiedToast: 'URL berhasil disalin ke papan klip!',
+    tunnelOpenBtn: 'Buka',
+    tunnelShareBtn: 'Bagikan',
+    tunnelErrorTitle: 'Gagal Membuat Tunnel',
   },
   en: {
     appName: 'Deploy Instant',
@@ -365,6 +380,21 @@ export const translations = {
     openLocalBtn: 'Open',
     openLocalTitle: 'Open Application',
     detectedPortLabel: 'Detected',
+
+    // Fase 10 Cloudflare Quick Tunnel
+    shareBtn: 'Share',
+    stopShareBtn: 'Stop Share',
+    sharingBtn: 'Connecting...',
+    shareWarningTitle: 'Public Access Warning',
+    shareWarningBody: 'This Quick Tunnel URL can be accessed by anyone on the internet who has the link. Make sure your application does not contain sensitive data or private API keys.',
+    shareWarningConfirm: 'Continue & Share',
+    shareWarningCancel: 'Cancel',
+    tunnelActiveTitle: 'Public Quick Tunnel',
+    tunnelCopyBtn: 'Copy',
+    tunnelCopiedToast: 'URL copied to clipboard!',
+    tunnelOpenBtn: 'Open',
+    tunnelShareBtn: 'Share',
+    tunnelErrorTitle: 'Tunnel Connection Failed',
   },
 } as const;
 

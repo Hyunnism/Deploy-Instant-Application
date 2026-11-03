@@ -333,6 +333,48 @@ export async function openLocalUrl(port: number): Promise<void> {
   return await invoke<void>('open_local_url', { port });
 }
 
+// Fase 10: Cloudflare Quick Tunnel
+export type TunnelStatus = 'stopped' | 'starting' | 'active' | 'error';
+
+export interface ProjectTunnelInfo {
+  project_id: number;
+  port: number;
+  url: string | null;
+  status: TunnelStatus;
+  error?: string | null;
+}
+
+export async function startTunnel(projectId: number): Promise<ProjectTunnelInfo> {
+  return await invoke<ProjectTunnelInfo>('start_tunnel', { projectId });
+}
+
+export async function stopTunnel(projectId: number): Promise<void> {
+  return await invoke<void>('stop_tunnel', { projectId });
+}
+
+export async function getTunnelStatus(projectId: number): Promise<ProjectTunnelInfo | null> {
+  return await invoke<ProjectTunnelInfo | null>('get_tunnel_status', { projectId });
+}
+
+export async function listActiveTunnels(): Promise<ProjectTunnelInfo[]> {
+  return await invoke<ProjectTunnelInfo[]>('list_active_tunnels');
+}
+
+export async function shareUrl(url: string, title: string): Promise<void> {
+  return await invoke<void>('share_url', { url, title });
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  return await invoke<void>('open_external_url', { url });
+}
+
+export async function onTunnelStatus(
+  callback: (info: ProjectTunnelInfo) => void
+): Promise<UnlistenFn> {
+  return await listen<ProjectTunnelInfo>('tunnel:status', (e) => callback(e.payload));
+}
+
+
 
 
 

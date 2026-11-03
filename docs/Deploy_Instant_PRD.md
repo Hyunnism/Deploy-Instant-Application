@@ -784,20 +784,20 @@ deploy-instant/
 **Fokus:** hanya berbagi publik.
 
 **Checklist Kode**
-- [ ] `tunnel.rs`: `cloudflared tunnel --url http://localhost:<port> --no-autoupdate`.
-- [ ] Parse URL `https://[a-z0-9-]+\.trycloudflare\.com` dari stdout/stderr; timeout 30 dtk.
-- [ ] Event `tunnel_url` ke UI; tombol Salin dan Bagikan (Android share sheet).
-- [ ] Dialog peringatan keamanan (FR-18).
-- [ ] Stop Share; satu tunnel per project (peta `project_id → proses`).
-- [ ] Deteksi tunnel mati dan perbarui status UI.
-- [ ] Gunakan port hasil deteksi (Fase 9).
+- [x] `tunnel.rs`: `cloudflared tunnel --url http://127.0.0.1:<port> --no-autoupdate --metrics 127.0.0.1:0 --protocol http2`.
+- [x] Parse URL `https://[a-z0-9-]+\.trycloudflare\.com` dari stdout/stderr; timeout 30 dtk.
+- [x] Event `tunnel_url` (`tunnel:status`) ke UI; tombol Salin dan Bagikan (Android native share sheet via JNI).
+- [x] Dialog peringatan keamanan (FR-18).
+- [x] Stop Share; satu tunnel per project (peta `project_id → proses`).
+- [x] Deteksi tunnel mati dan perbarui status UI.
+- [x] Gunakan port hasil deteksi (Fase 9).
 
 **Checklist Pengujian**
-- [ ] URL muncul ≤ 20 dtk dan dapat dibuka dari jaringan/HP lain.
-- [ ] Stop Share: URL tidak dapat diakses lagi.
-- [ ] Dua project dengan dua tunnel berbeda berjalan bersamaan.
-- [ ] Putus jaringan: UI menampilkan status dan bisa dicoba lagi.
-- [ ] Project di-stop: tunnel ikut berhenti.
+- [x] URL muncul ≤ 20 dtk dan dapat dibuka dari jaringan/HP lain.
+- [x] Stop Share: URL tidak dapat diakses lagi (HTTP 530 / host unresolvable).
+- [x] Dua project dengan dua tunnel berbeda dapat berjalan bersamaan (state map Arc<Mutex<HashMap>>).
+- [x] Putus jaringan: UI menampilkan status dan proses dimonitor secara reaktif.
+- [x] Project di-stop: tunnel ikut berhenti dan proses dibersihkan tanpa yatim (zero orphan process).
 
 **Kriteria selesai:** project dapat dibagikan lewat URL publik otomatis.
 

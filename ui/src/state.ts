@@ -6,6 +6,7 @@ import type {
   SetupProgress,
   SetupStatusResponse,
   SetupVerificationResult,
+  ProjectTunnelInfo,
 } from './api';
 import type { Language } from './i18n';
 
@@ -145,6 +146,15 @@ export interface AppState {
     autoScroll: boolean;
     unlistenFn: (() => void) | null;
   };
+
+  // Fase 10 Cloudflare Quick Tunnel State
+  tunnels: Record<number, ProjectTunnelInfo>;
+  tunnelLoading: Record<number, boolean>;
+  shareWarningModal: {
+    isOpen: boolean;
+    projectId: number | null;
+    projectName: string;
+  };
 }
 
 export interface RuntimeLogItem {
@@ -260,5 +270,14 @@ export const state: AppState = {
     isPaused: false,
     autoScroll: true,
     unlistenFn: null,
+  },
+
+  // Fase 10
+  tunnels: {},
+  tunnelLoading: {},
+  shareWarningModal: {
+    isOpen: false,
+    projectId: null,
+    projectName: '',
   },
 };

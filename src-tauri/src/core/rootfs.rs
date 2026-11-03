@@ -452,6 +452,12 @@ pub fn ensure_resolv_conf(rootfs_dir: &Path) -> Result<(), String> {
     let _ = fs::remove_file(&resolv_path);
     let content = "nameserver 1.1.1.1\nnameserver 8.8.8.8\n";
     let _ = fs::write(resolv_path, content);
+
+    // Pastikan /etc/hosts memetakan localhost agar Go/Node tidak meminta DNS luar untuk localhost
+    let hosts_path = etc_dir.join("hosts");
+    let hosts_content = "127.0.0.1 localhost\n::1 localhost ip6-localhost ip6-loopback\n";
+    let _ = fs::write(hosts_path, hosts_content);
+
     Ok(())
 }
 

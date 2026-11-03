@@ -1968,3 +1968,131 @@ body {
   color: #e2e8f0;
 }
 
+/* -------------------------------------------------------------
+ * FASE 10: CLOUDFLARE QUICK TUNNEL
+ * ------------------------------------------------------------- */
+.project-tunnel-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md, 10px);
+  padding: 10px 12px;
+  margin: 10px 0 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  animation: fadeInTunnel 0.25s ease-out;
+}
+
+.project-tunnel-box.connecting {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+
+@keyframes fadeInTunnel {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tunnel-header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tunnel-badge-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.tunnel-badge-pill.active {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.tunnel-badge-pill.starting {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.tunnel-url-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: #0369a1;
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.tunnel-url-text:hover {
+  color: #0284c7;
+}
+
+.tunnel-connecting-text {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.tunnel-actions-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-tunnel-act {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-tunnel-act:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.btn-tunnel-act.danger {
+  color: #dc2626;
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.btn-tunnel-act.danger:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+}
+
+.share-warning-modal-card {
+  max-width: 440px;
+  width: 90%;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+

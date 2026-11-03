@@ -22,6 +22,7 @@ pub fn run() {
             app.manage(db);
             app.manage(core::project::ActiveBuildManager::new());
             app.manage(core::pm2::create_log_stream_manager());
+            app.manage(core::tunnel::TunnelManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -62,6 +63,12 @@ pub fn run() {
             commands::pm2::runtime_logs_start,
             commands::pm2::runtime_logs_stop,
             commands::pm2::open_local_url,
+            commands::tunnel::start_tunnel,
+            commands::tunnel::stop_tunnel,
+            commands::tunnel::get_tunnel_status,
+            commands::tunnel::list_active_tunnels,
+            commands::tunnel::share_url,
+            commands::tunnel::open_external_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

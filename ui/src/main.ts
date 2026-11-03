@@ -36,6 +36,12 @@ import {
   stopProject,
   stopRuntimeLogs,
   onRuntimeLog,
+  startTunnel,
+  stopTunnel,
+  listActiveTunnels,
+  shareUrl,
+  openExternalUrl,
+  onTunnelStatus,
   updateProject,
   verifySetup,
   type BuildLogEvent,
@@ -43,6 +49,7 @@ import {
   type Pm2Status,
   type Project,
   type RuntimeLogEvent,
+  type ProjectTunnelInfo,
 } from './api';
 import { translations, type TranslationKey } from './i18n';
 import { defaultFormData, state, type FormEnvVar, type RuntimeLogItem } from './state';
@@ -443,6 +450,7 @@ function renderModals(animate = false) {
     ${renderBuildModal()}
     ${renderDotenvModal()}
     ${renderRuntimeLogsModal()}
+    ${renderShareWarningModal()}
   `;
 
   attachModalEventListeners();
@@ -565,6 +573,16 @@ function renderProjectCard(p: Project): string {
                 ${pm2?.status === 'online' ? `
                   <button class="dropdown-item btn-open-local" data-port="${activePort}">
                     <span>${t('openLocalTitle')} (:${activePort})</span>
+                  </button>
+                  <button class="dropdown-item btn-toggle-share" data-id="${p.id}">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="18" cy="5" r="3"></circle>
+                      <circle cx="6" cy="12" r="3"></circle>
+                      <circle cx="18" cy="19" r="3"></circle>
+                      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                    <span>${state.tunnels[p.id]?.status === 'active' ? t('stopShareBtn') : t('shareBtn')}</span>
                   </button>
                   <div class="dropdown-divider"></div>
                 ` : ''}
@@ -748,6 +766,34 @@ function renderProjectCard(p: Project): string {
            </div>
           `
       : ''
+    }
+
+      ${state.tunnelLoading[p.id]
+      ? `
+          <div class="project-tunnel-box connecting">
+            <div class="tunnel-header-row">
+              <span class="tunnel-badge-pill starting">● Cloudflare</span>
+              <span class="tunnel-connecting-text">${t('sharingBtn')}</span>
+            </div>
+          </div>
+        `
+      : (state.tunnels[p.id]?.status === 'active' && state.tunnels[p.id]?.url
+        ? `
+          <div class="project-tunnel-box">
+            <div class="tunnel-header-row">
+              <span class="tunnel-badge-pill active">● Quick Tunnel</span>
+              <span class="tunnel-url-text btn-tunnel-open" data-url="${state.tunnels[p.id].url}" title="Buka di Browser">${state.tunnels[p.id].url}</span>
+            </div>
+            <div class="tunnel-actions-row">
+              <button class="btn-tunnel-act btn-tunnel-open" data-url="${state.tunnels[p.id].url}">${t('tunnelOpenBtn')}</button>
+              <button class="btn-tunnel-act btn-tunnel-copy" data-url="${state.tunnels[p.id].url}">${t('tunnelCopyBtn')}</button>
+              <button class="btn-tunnel-act btn-tunnel-share" data-url="${state.tunnels[p.id].url}" data-name="${escapeHtml(p.name)}">${t('tunnelShareBtn')}</button>
+              <button class="btn-tunnel-act danger btn-tunnel-stop" data-id="${p.id}">${t('stopBtn')}</button>
+            </div>
+          </div>
+        `
+        : ''
+      )
     }
 
       <div class="project-repo-line">
@@ -1205,6 +1251,43 @@ function renderRuntimeLogsModal(): string {
 }
 
 // -------------------------------------------------------------
+// SHARE WARNING MODAL (PRD FR-18)
+// -------------------------------------------------------------
+function renderShareWarningModal(): string {
+  const modal = state.shareWarningModal;
+  if (!modal.isOpen) return '';
+
+  return `
+    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}">
+      <div class="modal-card share-warning-modal-card">
+        <div class="modal-header">
+          <div class="modal-title-box">
+            <h3 class="modal-title">${t('shareWarningTitle')}</h3>
+            <p class="modal-subtitle">${escapeHtml(modal.projectName)}</p>
+          </div>
+          <button class="btn-icon-close btn-close-share-warning" aria-label="Tutup">✕</button>
+        </div>
+        <div class="modal-body" style="padding: 16px 20px;">
+          <div class="share-warning-content">
+            <p style="font-size: 0.86rem; color: #475569; line-height: 1.5; margin: 0;">
+              ${t('shareWarningBody')}
+            </p>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px;">
+          <button class="modal-btn secondary btn-close-share-warning" style="height: 38px; padding: 0 16px;">
+            ${t('shareWarningCancel')}
+          </button>
+          <button class="modal-btn primary btn-confirm-share" data-id="${modal.projectId}" style="height: 38px; padding: 0 16px;">
+            ${t('shareWarningConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // DELETE CONFIRMATION MODAL
 // -------------------------------------------------------------
 function renderDeleteModal(): string {
@@ -1528,6 +1611,40 @@ function renderBuildModal(): string {
 // -------------------------------------------------------------
 // EVENT LISTENERS: VIEW (MAIN CONTAINER)
 // -------------------------------------------------------------
+
+async function handleStartTunnel(projectId: number) {
+  const p = state.projects.find((proj) => proj.id === projectId);
+  if (!p) return;
+
+  state.tunnelLoading[projectId] = true;
+  renderView();
+
+  try {
+    const res = await startTunnel(projectId);
+    state.tunnels[projectId] = res;
+  } catch (err: any) {
+    alert(`${t('tunnelErrorTitle')}: ${String(err)}`);
+  } finally {
+    state.tunnelLoading[projectId] = false;
+    renderView();
+  }
+}
+
+async function handleStopTunnel(projectId: number) {
+  state.tunnelLoading[projectId] = true;
+  renderView();
+
+  try {
+    await stopTunnel(projectId);
+    delete state.tunnels[projectId];
+  } catch (err: any) {
+    alert(String(err));
+  } finally {
+    state.tunnelLoading[projectId] = false;
+    renderView();
+  }
+}
+
 function attachViewEventListeners() {
   // Navigation
   document.getElementById('btn-open-settings')?.addEventListener('click', () => {
@@ -1789,6 +1906,119 @@ function attachViewEventListeners() {
     });
   });
 
+  // Fase 10: Toggle Quick Tunnel dari menu titik 3
+  document.querySelectorAll('.btn-toggle-share').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      state.openProjectMenuId = null;
+      renderView();
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      if (state.tunnels[id]?.status === 'active') {
+        await handleStopTunnel(id);
+      } else {
+        state.shareWarningModal = {
+          isOpen: true,
+          projectId: id,
+          projectName: p.name,
+        };
+        renderModals(true);
+      }
+    });
+  });
+
+  // Fase 10: Tombol Buka URL Quick Tunnel di browser
+  document.querySelectorAll('.btn-tunnel-open').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const url = el.getAttribute('data-url');
+      if (!url) return;
+      try {
+        await openExternalUrl(url);
+      } catch (err: any) {
+        alert(String(err));
+      }
+    });
+  });
+
+  // Fase 10: Tombol Salin URL Quick Tunnel
+  document.querySelectorAll('.btn-tunnel-copy').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const url = el.getAttribute('data-url');
+      if (!url) return;
+      const btn = el as HTMLButtonElement;
+      let copied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(url);
+          copied = true;
+        }
+      } catch (_) {
+        // Fallback via temporary textarea
+      }
+      if (!copied) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = url;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          copied = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (_) {}
+      }
+      if (copied) {
+        const origText = btn.textContent;
+        btn.textContent = t('tunnelCopiedToast');
+        setTimeout(() => {
+          btn.textContent = origText;
+        }, 1500);
+      }
+    });
+  });
+
+  // Fase 10: Tombol Bagikan Native Share Sheet
+  document.querySelectorAll('.btn-tunnel-share').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const url = el.getAttribute('data-url');
+      const name = el.getAttribute('data-name') || 'Deploy Instant App';
+      if (!url) return;
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: name,
+            text: `Buka aplikasi ${name} secara online:`,
+            url: url,
+          });
+          return;
+        } catch (_) {
+          // Fallback to Tauri JNI Intent
+        }
+      }
+      try {
+        await shareUrl(url, name);
+      } catch (err: any) {
+        alert(String(err));
+      }
+    });
+  });
+
+  // Fase 10: Tombol Stop Quick Tunnel dari banner
+  document.querySelectorAll('.btn-tunnel-stop').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = Number(el.getAttribute('data-id'));
+      if (!id) return;
+      await handleStopTunnel(id);
+    });
+  });
+
   // View Build Logs Modal Opener
   document.querySelectorAll('.btn-view-build-log').forEach((el) => {
     el.addEventListener('click', async () => {
@@ -1999,6 +2229,25 @@ function attachViewEventListeners() {
 // EVENT LISTENERS: MODALS (ISOLATED MODAL CONTAINER)
 // -------------------------------------------------------------
 function attachModalEventListeners() {
+  // Share Warning Modal Handlers (Fase 10)
+  document.querySelectorAll('.btn-close-share-warning').forEach((el) => {
+    el.addEventListener('click', () => {
+      state.shareWarningModal.isOpen = false;
+      renderModals(false);
+    });
+  });
+
+  document.querySelectorAll('.btn-confirm-share').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const id = Number(el.getAttribute('data-id'));
+      state.shareWarningModal.isOpen = false;
+      renderModals(false);
+      if (id) {
+        await handleStartTunnel(id);
+      }
+    });
+  });
+
   // Engine Modal Handlers
   document.getElementById('btn-close-engine-modal')?.addEventListener('click', () => {
     state.engineModal.isOpen = false;
@@ -2575,8 +2824,22 @@ async function refreshPm2Statuses() {
     const map: Record<string, Pm2Status> = {};
     for (const item of list) {
       map[item.name] = item;
+      // Jika project tidak online, pastikan tunnel dihapus dari active state
+      if (item.status !== 'online') {
+        const p = state.projects.find((proj) => proj.name === item.name);
+        if (p && state.tunnels[p.id]) {
+          delete state.tunnels[p.id];
+        }
+      }
     }
     state.pm2Statuses = map;
+
+    try {
+      const activeTunnels = await listActiveTunnels();
+      for (const t of activeTunnels) {
+        state.tunnels[t.project_id] = t;
+      }
+    } catch (_) {}
     if (isAnyModalOpen()) {
       renderView();
     } else {
@@ -2659,6 +2922,19 @@ async function init() {
     });
   } catch (e) {
     console.error('Failed to register runtime:log listener:', e);
+  }
+
+  // Listen to Quick Tunnel status (Fase 10)
+  try {
+    await onTunnelStatus((info: ProjectTunnelInfo) => {
+      state.tunnels[info.project_id] = info;
+      if (info.status !== 'starting') {
+        state.tunnelLoading[info.project_id] = false;
+      }
+      renderView();
+    });
+  } catch (e) {
+    console.error('Failed to register tunnel:status listener:', e);
   }
 
   // Load language setting

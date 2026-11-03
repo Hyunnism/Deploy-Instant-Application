@@ -1,6 +1,7 @@
 // commands/pm2.rs
 // Lapisan tipis Tauri Command untuk PM2 Process Management (PRD Bagian 8.3 & 13 Fase 7)
 
+use crate::core::tunnel::TunnelManager;
 use crate::core::{pm2, rootfs};
 use crate::models::Pm2Status;
 use crate::storage::db::Database;
@@ -72,6 +73,11 @@ pub async fn pm2_stop(app: AppHandle, project_id: i64) -> Result<Pm2Status, Stri
     let db = app.state::<Database>();
     let project = db.get_project(project_id).map_err(|e| e.to_string())?;
 
+    // Hentikan Quick Tunnel jika sedang aktif untuk project ini (PRD Bagian 13 Fase 10)
+    if let Some(tunnel_mgr) = app.try_state::<TunnelManager>() {
+        let _ = tunnel_mgr.stop_tunnel(&app, project_id).await;
+    }
+
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
     pm2::stop_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
@@ -96,6 +102,11 @@ pub async fn pm2_delete(app: AppHandle, project_id: i64) -> Result<(), String> {
     let db = app.state::<Database>();
     let project = db.get_project(project_id).map_err(|e| e.to_string())?;
 
+    // Hentikan Quick Tunnel jika sedang aktif
+    if let Some(tunnel_mgr) = app.try_state::<TunnelManager>() {
+        let _ = tunnel_mgr.stop_tunnel(&app, project_id).await;
+    }
+
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
     pm2::delete_process(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false)
@@ -114,6 +125,11 @@ pub async fn pm2_list(app: AppHandle) -> Result<Vec<Pm2Status>, String> {
 
 #[tauri::command]
 pub async fn pm2_stop_all(app: AppHandle) -> Result<(), String> {
+    // Hentikan seluruh Quick Tunnel aktif (PRD Bagian 13 Fase 10)
+    if let Some(tunnel_mgr) = app.try_state::<TunnelManager>() {
+        let _ = tunnel_mgr.stop_all(&app).await;
+    }
+
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
     pm2::stop_all_processes(&proot_bin, &rootfs_dir, &tmp_dir, false)
