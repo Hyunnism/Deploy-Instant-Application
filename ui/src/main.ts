@@ -1258,7 +1258,7 @@ function renderShareWarningModal(): string {
   if (!modal.isOpen) return '';
 
   return `
-    <div class="modal-overlay ${state.modalAnimateIn ? 'animate-in' : ''}">
+    <div class="modal-overlay dialog ${state.modalAnimateIn ? 'animate-in' : ''}">
       <div class="modal-card share-warning-modal-card">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -1267,14 +1267,14 @@ function renderShareWarningModal(): string {
           </div>
           <button class="btn-icon-close btn-close-share-warning" aria-label="Tutup">✕</button>
         </div>
-        <div class="modal-body" style="padding: 16px 20px;">
+        <div class="modal-body" style="padding: 18px 20px;">
           <div class="share-warning-content">
-            <p style="font-size: 0.86rem; color: #475569; line-height: 1.5; margin: 0;">
+            <p style="font-size: 0.88rem; color: #475569; line-height: 1.55; margin: 0;">
               ${t('shareWarningBody')}
             </p>
           </div>
         </div>
-        <div class="modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px;">
+        <div class="modal-footer share-warning-footer">
           <button class="modal-btn secondary btn-close-share-warning" style="height: 38px; padding: 0 16px;">
             ${t('shareWarningCancel')}
           </button>
