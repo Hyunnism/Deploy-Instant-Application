@@ -80,6 +80,9 @@ pub async fn project_clone(
     db: State<'_, Database>,
     id: i64,
 ) -> Result<RepoStatus, String> {
+    // Fase 12: Cek ruang disk sebelum clone
+    crate::core::storage::check_free_disk_space(&app, 150).map_err(|e| e.to_string())?;
+
     let proj = db.get_project(id).map_err(|e| e.to_string())?;
     let app_files_dir = app
         .path()
@@ -164,6 +167,9 @@ pub async fn project_build(
     build_manager: State<'_, core_project::ActiveBuildManager>,
     id: i64,
 ) -> Result<BuildResult, String> {
+    // Fase 12: Cek ruang disk sebelum build
+    crate::core::storage::check_free_disk_space(&app, 250).map_err(|e| e.to_string())?;
+
     let proj = db.get_project(id).map_err(|e| e.to_string())?;
     let app_files_dir = app
         .path()
@@ -248,4 +254,72 @@ pub fn project_env_import_dotenv(
     db.set_env_vars_batch(id, &parsed)
         .map_err(|e| e.to_string())?;
     db.get_env_vars(id).map_err(|e| e.to_string())
+}
+
+// -----------------------------------------------------------------------------
+// EKSPOR & IMPOR KONFIGURASI PROYEK (FR-23 / FASE 12)
+// -----------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn project_export_config(db: State<'_, Database>, id: i64) -> Result<String, String> {
+    let proj = db.get_project(id).map_err(|e| e.to_string())?;
+    let config = crate::models::ProjectExportConfig {
+        name: proj.name,
+        repo_url: proj.repo_url,
+        branch: proj.branch,
+        port_manual: proj.port_manual,
+        build_cmd: proj.build_cmd,
+        start_cmd: proj.start_cmd,
+        auto_start: proj.auto_start,
+    };
+    serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Gagal mengonversi konfigurasi ke JSON: {e}"))
+}
+
+#[tauri::command]
+pub fn project_export_all_configs(db: State<'_, Database>) -> Result<String, String> {
+    let projects = db.list_projects().map_err(|e| e.to_string())?;
+    let configs: Vec<crate::models::ProjectExportConfig> = projects
+        .into_iter()
+        .map(|p| crate::models::ProjectExportConfig {
+            name: p.name,
+            repo_url: p.repo_url,
+            branch: p.branch,
+            port_manual: p.port_manual,
+            build_cmd: p.build_cmd,
+            start_cmd: p.start_cmd,
+            auto_start: p.auto_start,
+        })
+        .collect();
+
+    serde_json::to_string_pretty(&configs)
+        .map_err(|e| format!("Gagal mengonversi seluruh konfigurasi ke JSON: {e}"))
+}
+
+#[tauri::command]
+pub fn project_import_config(
+    db: State<'_, Database>,
+    json_content: String,
+) -> Result<Project, String> {
+    let config: crate::models::ProjectExportConfig = serde_json::from_str(&json_content)
+        .map_err(|e| format!("Format JSON konfigurasi tidak valid: {e}"))?;
+
+    let branch = if config.branch.trim().is_empty() {
+        "main".to_string()
+    } else {
+        config.branch
+    };
+
+    let input = CreateProjectInput {
+        name: config.name,
+        repo_url: config.repo_url,
+        branch: Some(branch),
+        build_cmd: Some(config.build_cmd),
+        start_cmd: Some(config.start_cmd),
+        port_manual: config.port_manual,
+        auto_start: Some(config.auto_start),
+        env_vars: None,
+    };
+
+    db.create_project(input).map_err(|e| e.to_string())
 }

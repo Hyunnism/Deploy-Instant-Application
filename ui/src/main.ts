@@ -46,6 +46,12 @@ import {
   onTunnelStatus,
   updateProject,
   verifySetup,
+  getSystemStorageInfo,
+  getProjectStorageInfo,
+  cleanProjectStorage,
+  exportProjectConfig,
+  exportAllConfigs,
+  importProjectConfig,
   type BuildLogEvent,
   type GitLogEvent,
   type Pm2Status,
@@ -85,6 +91,32 @@ function formatUptime(seconds: number): string {
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
   return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
 }
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function applyTheme(theme: 'system' | 'light' | 'dark') {
+  state.theme = theme;
+  localStorage.setItem('deploy_instant_theme', theme);
+  const root = document.documentElement;
+  if (theme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  } else {
+    root.setAttribute('data-theme', theme);
+  }
+}
+
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (state.theme === 'system') {
+    document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+  }
+});
 
 function addEngineLog(msg: string) {
   const d = new Date();
@@ -377,7 +409,11 @@ function isAnyModalOpen(): boolean {
     state.gitLogModal.isOpen ||
     state.buildModal.isOpen ||
     state.dotenvModal.isOpen ||
-    state.runtimeLogsModal.isOpen
+    state.runtimeLogsModal.isOpen ||
+    state.shareWarningModal.isOpen ||
+    state.storageModal.isOpen ||
+    state.exportModal.isOpen ||
+    state.importModal.isOpen
   );
 }
 
@@ -453,6 +489,9 @@ function renderModals(animate = false) {
     ${renderDotenvModal()}
     ${renderRuntimeLogsModal()}
     ${renderShareWarningModal()}
+    ${renderStorageModal()}
+    ${renderExportModal()}
+    ${renderImportModal()}
   `;
 
   attachModalEventListeners();
@@ -500,10 +539,17 @@ function renderDashboardView(isReady: boolean): string {
         </div>
         <div class="metric-col">
           <span class="metric-label">${t('storageUsed')}</span>
-          <span class="metric-val">${isReady ? '~343 MB' : '-'}</span>
+          <span class="metric-val">${state.systemStorage ? `${state.systemStorage.rootfs_mb} MB` : (isReady ? '~343 MB' : '-')}</span>
         </div>
       </div>
     </section>
+
+    ${state.systemStorage?.is_low_space ? `
+      <div class="storage-warning-banner">
+        <div class="storage-warning-title">⚠️ ${t('lowStorageWarningTitle')}</div>
+        <div class="storage-warning-desc">${t('lowStorageWarningDesc')}</div>
+      </div>
+    ` : ''}
 
     <!-- Project List Section -->
     <section class="section-header">
@@ -515,6 +561,9 @@ function renderDashboardView(isReady: boolean): string {
              </button>`
       : ''
     }
+        <button class="pill-icon-btn secondary" id="btn-open-import-modal" title="${t('importConfigBtn')}">
+          ${t('importBtn')}
+        </button>
         <button class="pill-icon-btn primary" id="btn-create-project-header">
           ${t('newProjectBtn')}
         </button>
@@ -594,6 +643,23 @@ function renderProjectCard(p: Project): string {
                     <line x1="12" y1="19" x2="20" y2="19"></line>
                   </svg>
                   <span>${t('viewRuntimeLogsBtn')}</span>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item btn-open-storage" data-id="${p.id}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                  </svg>
+                  <span>${t('storageMenuOption')}</span>
+                </button>
+                <button class="dropdown-item btn-export-project" data-id="${p.id}">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>${t('exportConfigBtn')}</span>
                 </button>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item btn-edit-project" data-id="${p.id}">
@@ -904,6 +970,60 @@ function renderSettingsView(): string {
         </div>
       </div>
 
+      <!-- Fase 12: Display Theme Section -->
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('themeSection')}</h2>
+        </div>
+        <div class="lang-select-group">
+          <button class="lang-pill-btn ${state.theme === 'system' ? 'active' : ''}" id="btn-theme-system">
+            ${t('themeSystem')}
+          </button>
+          <button class="lang-pill-btn ${state.theme === 'light' ? 'active' : ''}" id="btn-theme-light">
+            ${t('themeLight')}
+          </button>
+          <button class="lang-pill-btn ${state.theme === 'dark' ? 'active' : ''}" id="btn-theme-dark">
+            ${t('themeDark')}
+          </button>
+        </div>
+      </div>
+
+      <!-- Fase 12: Device Storage Capacity Section -->
+      <div class="settings-card">
+        <div class="overview-title-group">
+          <h2>${t('systemStorageTitle')}</h2>
+          <div class="overview-subtitle">
+            ${state.systemStorage?.is_low_space
+              ? `<span class="status-badge warning" style="margin-top: 4px; display: inline-flex;">${t('lowStorageWarningTitle')}</span>`
+              : `<span class="status-badge healthy" style="margin-top: 4px; display: inline-flex;">Normal</span>`
+            }
+          </div>
+        </div>
+        <div class="settings-row" style="margin-top: 8px;">
+          <span class="metric-label">${t('freeSpaceLabel')}</span>
+          <span class="metric-val" style="font-size: 0.88rem; font-weight: 600; color: ${state.systemStorage?.is_low_space ? 'var(--warning)' : 'inherit'};">
+            ${state.systemStorage ? `${formatBytes(state.systemStorage.free_disk_bytes)} (${state.systemStorage.free_disk_mb} MB)` : '-'}
+          </span>
+        </div>
+        <div class="settings-row">
+          <span class="metric-label">${t('rootfsSpaceLabel')}</span>
+          <span class="metric-val" style="font-size: 0.88rem;">
+            ${state.systemStorage ? `${formatBytes(state.systemStorage.rootfs_bytes)} (${state.systemStorage.rootfs_mb} MB)` : '-'}
+          </span>
+        </div>
+        <div class="settings-row">
+          <span class="metric-label">${t('projectsSpaceLabel')}</span>
+          <span class="metric-val" style="font-size: 0.88rem;">
+            ${state.systemStorage ? `${formatBytes(state.systemStorage.projects_total_bytes)} (${state.systemStorage.projects_total_mb} MB)` : '-'}
+          </span>
+        </div>
+        <div style="margin-top: 12px; display: flex; gap: 8px;">
+          <button class="modal-btn secondary" id="btn-export-all-configs" style="flex: 1; justify-content: center; height: 38px;">
+            ${t('exportAllConfigsBtn')}
+          </button>
+        </div>
+      </div>
+
       <!-- Language Section -->
       <div class="settings-card">
         <div class="overview-title-group">
@@ -926,7 +1046,7 @@ function renderSettingsView(): string {
         </div>
         <div class="settings-row">
           <span class="metric-label">${t('appVersion')}</span>
-          <span class="metric-val" style="font-size: 0.88rem;">v0.5.0 (Fase 4 - Git Engine)</span>
+          <span class="metric-val" style="font-size: 0.88rem;">v1.0.0 (Fase 12 - Storage & Polish)</span>
         </div>
         <div class="settings-row">
           <span class="metric-label">${t('engineRuntime')}</span>
@@ -1302,6 +1422,194 @@ function renderShareWarningModal(): string {
           </button>
           <button class="modal-btn primary btn-confirm-share" data-id="${modal.projectId}" style="height: 38px; padding: 0 16px;">
             ${t('shareWarningConfirm')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FASE 12: STORAGE & CLEANUP MODAL
+// -------------------------------------------------------------
+function renderStorageModal(): string {
+  const modal = state.storageModal;
+  if (!modal.isOpen || !modal.project) return '';
+
+  const p = modal.project;
+  const info = modal.info;
+  const animClass = state.modalAnimateIn ? 'animate-in' : '';
+
+  return `
+    <div class="modal-overlay dialog ${animClass}" id="storage-modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-box">
+            <h3 class="modal-title">${t('storageModalTitle')}</h3>
+            <p class="modal-subtitle">
+              ${escapeHtml(p.name)} &bull; ${t('storageModalSubtitle')}
+            </p>
+          </div>
+          <button class="btn-icon-close" id="btn-close-storage-modal" aria-label="Tutup">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 18px 20px;">
+          ${modal.isLoading ? `
+            <div style="padding: 24px; text-align: center; color: var(--text-muted);">
+              <div>Menghitung penggunaan penyimpanan...</div>
+            </div>
+          ` : `
+            <div class="storage-breakdown-card">
+              <div class="storage-row total">
+                <span class="label">${t('storageTotalSize')}</span>
+                <span class="val">${info ? formatBytes(info.total_bytes) : '-'}</span>
+              </div>
+              <div class="storage-row">
+                <span class="label">${t('storageSourceCode')}</span>
+                <span class="val">${info ? formatBytes(info.source_bytes) : '-'}</span>
+              </div>
+              <div class="storage-row">
+                <span class="label">${t('storageNodeModules')}</span>
+                <span class="val">${info ? formatBytes(info.node_modules_bytes) : '-'}</span>
+              </div>
+              <div class="storage-row">
+                <span class="label">${t('storageLogs')}</span>
+                <span class="val">${info ? formatBytes(info.logs_bytes) : '-'}</span>
+              </div>
+            </div>
+
+            <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; margin-top: 14px;">
+              ${t('cleanConfirmDesc')}
+            </p>
+          `}
+        </div>
+
+        <div class="modal-footer" style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <button 
+              class="modal-btn secondary" 
+              id="btn-clean-logs" 
+              style="flex: 1; justify-content: center; height: 38px;"
+              ${modal.isCleaning || modal.isLoading || !info?.has_logs ? 'disabled' : ''}
+            >
+              ${t('cleanLogsBtn')}
+            </button>
+            <button 
+              class="modal-btn secondary" 
+              id="btn-clean-node-modules" 
+              style="flex: 1; justify-content: center; height: 38px;"
+              ${modal.isCleaning || modal.isLoading || !info?.has_node_modules ? 'disabled' : ''}
+            >
+              ${t('cleanNodeModulesBtn')}
+            </button>
+          </div>
+          <div style="display: flex; gap: 8px; width: 100%;">
+            <button 
+              class="modal-btn danger" 
+              id="btn-clean-all" 
+              style="flex: 1; justify-content: center; height: 38px;"
+              ${modal.isCleaning || modal.isLoading || (!info?.has_node_modules && !info?.has_logs) ? 'disabled' : ''}
+            >
+              ${modal.isCleaning ? 'Membersihkan...' : t('cleanAllBtn')}
+            </button>
+            <button class="modal-btn secondary" id="btn-cancel-storage-modal" style="width: 80px; justify-content: center; height: 38px;">
+              ${t('modalClose')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FASE 12: EXPORT CONFIG MODAL (FR-23)
+// -------------------------------------------------------------
+function renderExportModal(): string {
+  const modal = state.exportModal;
+  if (!modal.isOpen) return '';
+  const animClass = state.modalAnimateIn ? 'animate-in' : '';
+
+  return `
+    <div class="modal-overlay dialog ${animClass}" id="export-modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-box">
+            <h3 class="modal-title">${t('exportModalTitle')}</h3>
+            <p class="modal-subtitle">
+              ${escapeHtml(modal.projectName || 'All Projects')}
+            </p>
+          </div>
+          <button class="btn-icon-close" id="btn-close-export-modal" aria-label="Tutup">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 18px 20px;">
+          <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.45; margin-bottom: 8px;">
+            ${t('exportModalDesc')}
+          </p>
+          <textarea 
+            class="form-input mono" 
+            id="export-json-content" 
+            readonly 
+            style="width: 100%; height: 200px; font-size: 0.75rem; resize: none; background: var(--bg-hover);"
+          >${escapeHtml(modal.jsonContent)}</textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn secondary" id="btn-cancel-export-modal" style="height: 38px; padding: 0 16px;">
+            ${t('modalClose')}
+          </button>
+          <button class="modal-btn primary" id="btn-copy-export-json" style="height: 38px; padding: 0 16px;">
+            ${t('copyJsonBtn')}
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
+// FASE 12: IMPORT CONFIG MODAL (FR-23)
+// -------------------------------------------------------------
+function renderImportModal(): string {
+  const modal = state.importModal;
+  if (!modal.isOpen) return '';
+  const animClass = state.modalAnimateIn ? 'animate-in' : '';
+
+  return `
+    <div class="modal-overlay dialog ${animClass}" id="import-modal-overlay">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-box">
+            <h3 class="modal-title">${t('importModalTitle')}</h3>
+            <p class="modal-subtitle">
+              ${t('importModalDesc')}
+            </p>
+          </div>
+          <button class="btn-icon-close" id="btn-close-import-modal" aria-label="Tutup">✕</button>
+        </div>
+
+        <div class="modal-body" style="padding: 18px 20px;">
+          <textarea 
+            class="form-input mono" 
+            id="input-import-json" 
+            placeholder='${t('importPlaceholder')}'
+            style="width: 100%; height: 180px; font-size: 0.75rem; resize: none;"
+          >${escapeHtml(modal.jsonContent)}</textarea>
+
+          ${modal.error ? `
+            <div class="modal-alert error" style="margin-top: 8px;">
+              ${escapeHtml(modal.error)}
+            </div>
+          ` : ''}
+        </div>
+
+        <div class="modal-footer">
+          <button class="modal-btn secondary" id="btn-cancel-import-modal" style="height: 38px; padding: 0 16px;">
+            ${t('modalCancel')}
+          </button>
+          <button class="modal-btn primary" id="btn-submit-import-json" style="height: 38px; padding: 0 16px;" ${modal.isImporting ? 'disabled' : ''}>
+            ${modal.isImporting ? 'Mengimpor...' : t('doImportBtn')}
           </button>
         </div>
       </div>
@@ -2261,6 +2569,101 @@ function attachViewEventListeners() {
       renderModals(true);
     });
   });
+
+  // Project Storage & Cleanup modal open (Fase 12)
+  document.querySelectorAll('.btn-open-storage').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      state.storageModal = {
+        isOpen: true,
+        project: p,
+        isLoading: true,
+        isCleaning: false,
+        info: null,
+      };
+      renderView();
+      renderModals(true);
+
+      try {
+        const info = await getProjectStorageInfo(p.id);
+        state.storageModal.info = info;
+        state.projectStorage[p.id] = info;
+      } catch (err: any) {
+        alert('Gagal mengambil info penyimpanan: ' + String(err));
+      } finally {
+        state.storageModal.isLoading = false;
+        renderModals(false);
+      }
+    });
+  });
+
+  // Project Export Config (FR-23)
+  document.querySelectorAll('.btn-export-project').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      state.openProjectMenuId = null;
+      const id = Number(el.getAttribute('data-id'));
+      const p = state.projects.find((proj) => proj.id === id);
+      if (!p) return;
+
+      try {
+        const jsonContent = await exportProjectConfig(p.id);
+        state.exportModal = {
+          isOpen: true,
+          projectName: p.name,
+          jsonContent,
+        };
+        renderModals(true);
+      } catch (err: any) {
+        alert('Gagal ekspor konfigurasi: ' + String(err));
+      }
+    });
+  });
+
+  // Open Import Modal from dashboard header (FR-23)
+  document.getElementById('btn-open-import-modal')?.addEventListener('click', () => {
+    state.importModal = {
+      isOpen: true,
+      jsonContent: '',
+      isImporting: false,
+      error: null,
+    };
+    renderModals(true);
+  });
+
+  // Display Theme toggles (Fase 12)
+  document.getElementById('btn-theme-system')?.addEventListener('click', () => {
+    applyTheme('system');
+    renderView();
+  });
+  document.getElementById('btn-theme-light')?.addEventListener('click', () => {
+    applyTheme('light');
+    renderView();
+  });
+  document.getElementById('btn-theme-dark')?.addEventListener('click', () => {
+    applyTheme('dark');
+    renderView();
+  });
+
+  // Export All Projects (FR-23)
+  document.getElementById('btn-export-all-configs')?.addEventListener('click', async () => {
+    try {
+      const jsonContent = await exportAllConfigs();
+      state.exportModal = {
+        isOpen: true,
+        projectName: 'Semua Project',
+        jsonContent,
+      };
+      renderModals(true);
+    } catch (err: any) {
+      alert('Gagal ekspor konfigurasi semua project: ' + String(err));
+    }
+  });
 }
 
 // -------------------------------------------------------------
@@ -2749,6 +3152,136 @@ function attachModalEventListeners() {
       renderModals(false);
     }
   });
+
+  // Storage Modal Handlers (Fase 12)
+  const closeStorageModal = () => {
+    state.storageModal.isOpen = false;
+    renderModals(false);
+  };
+  document.getElementById('btn-close-storage-modal')?.addEventListener('click', closeStorageModal);
+  document.getElementById('btn-cancel-storage-modal')?.addEventListener('click', closeStorageModal);
+
+  document.getElementById('btn-clean-logs')?.addEventListener('click', async () => {
+    const p = state.storageModal.project;
+    if (!p) return;
+    state.storageModal.isCleaning = true;
+    renderModals(false);
+    try {
+      const freed = await cleanProjectStorage(p.id, 'logs');
+      alert(`${t('cleanSuccessToast')} (${formatBytes(freed)})`);
+      const info = await getProjectStorageInfo(p.id);
+      state.storageModal.info = info;
+      state.projectStorage[p.id] = info;
+      state.systemStorage = await getSystemStorageInfo();
+    } catch (err: any) {
+      alert('Gagal membersihkan log: ' + String(err));
+    } finally {
+      state.storageModal.isCleaning = false;
+      renderModals(false);
+      renderView();
+    }
+  });
+
+  document.getElementById('btn-clean-node-modules')?.addEventListener('click', async () => {
+    const p = state.storageModal.project;
+    if (!p) return;
+    state.storageModal.isCleaning = true;
+    renderModals(false);
+    try {
+      const freed = await cleanProjectStorage(p.id, 'node_modules');
+      alert(`${t('cleanSuccessToast')} (${formatBytes(freed)})`);
+      const info = await getProjectStorageInfo(p.id);
+      state.storageModal.info = info;
+      state.projectStorage[p.id] = info;
+      state.systemStorage = await getSystemStorageInfo();
+    } catch (err: any) {
+      alert('Gagal membersihkan node_modules: ' + String(err));
+    } finally {
+      state.storageModal.isCleaning = false;
+      renderModals(false);
+      renderView();
+    }
+  });
+
+  document.getElementById('btn-clean-all')?.addEventListener('click', async () => {
+    const p = state.storageModal.project;
+    if (!p) return;
+    state.storageModal.isCleaning = true;
+    renderModals(false);
+    try {
+      const freed = await cleanProjectStorage(p.id, 'all');
+      alert(`${t('cleanSuccessToast')} (${formatBytes(freed)})`);
+      const info = await getProjectStorageInfo(p.id);
+      state.storageModal.info = info;
+      state.projectStorage[p.id] = info;
+      state.systemStorage = await getSystemStorageInfo();
+    } catch (err: any) {
+      alert('Gagal membersihkan semua file: ' + String(err));
+    } finally {
+      state.storageModal.isCleaning = false;
+      renderModals(false);
+      renderView();
+    }
+  });
+
+  // Export Modal Handlers (FR-23)
+  const closeExportModal = () => {
+    state.exportModal.isOpen = false;
+    renderModals(false);
+  };
+  document.getElementById('btn-close-export-modal')?.addEventListener('click', closeExportModal);
+  document.getElementById('btn-cancel-export-modal')?.addEventListener('click', closeExportModal);
+
+  document.getElementById('btn-copy-export-json')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(state.exportModal.jsonContent);
+      const btn = document.getElementById('btn-copy-export-json');
+      if (btn) btn.textContent = t('jsonCopiedToast');
+      setTimeout(() => {
+        if (btn) btn.textContent = t('copyJsonBtn');
+      }, 1500);
+    } catch (err: any) {
+      alert('Gagal menyalin: ' + String(err));
+    }
+  });
+
+  // Import Modal Handlers (FR-23)
+  const closeImportModal = () => {
+    state.importModal.isOpen = false;
+    state.importModal.error = null;
+    renderModals(false);
+  };
+  document.getElementById('btn-close-import-modal')?.addEventListener('click', closeImportModal);
+  document.getElementById('btn-cancel-import-modal')?.addEventListener('click', closeImportModal);
+
+  document.getElementById('input-import-json')?.addEventListener('input', (e) => {
+    state.importModal.jsonContent = (e.target as HTMLTextAreaElement).value;
+  });
+
+  document.getElementById('btn-submit-import-json')?.addEventListener('click', async () => {
+    const content = state.importModal.jsonContent.trim();
+    if (!content) {
+      state.importModal.error = 'Masukkan konfigurasi JSON terlebih dahulu.';
+      renderModals(false);
+      return;
+    }
+    state.importModal.isImporting = true;
+    state.importModal.error = null;
+    renderModals(false);
+
+    try {
+      await importProjectConfig(content);
+      alert(t('importSuccessToast'));
+      state.importModal.isOpen = false;
+      await loadProjects();
+      renderView();
+      renderModals(false);
+    } catch (err: any) {
+      state.importModal.error = String(err);
+      state.importModal.isImporting = false;
+      renderModals(false);
+    }
+  });
 }
 
 // Helper untuk aksi build
@@ -2927,6 +3460,7 @@ document.addEventListener('click', (e) => {
 });
 
 async function init() {
+  applyTheme(state.theme);
   render();
 
   // Listen to Git streaming logs
@@ -3006,6 +3540,13 @@ async function init() {
     state.batteryIgnored = await getBatteryStatus();
   } catch (e) {
     console.warn('Failed to get battery status:', e);
+  }
+
+  // Load system storage info (Fase 12)
+  try {
+    state.systemStorage = await getSystemStorageInfo();
+  } catch (e) {
+    console.warn('Failed to load system storage:', e);
   }
 
   // Load projects

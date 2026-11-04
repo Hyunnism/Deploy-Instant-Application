@@ -193,3 +193,40 @@ pub struct ProjectTunnelInfo {
     pub status: TunnelStatus,
     pub error: Option<String>,
 }
+
+/// Informasi penggunaan penyimpanan per project (PRD Bagian 13 Fase 12)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectStorageInfo {
+    pub project_id: i64,
+    pub project_name: String,
+    pub total_bytes: u64,
+    pub source_bytes: u64,
+    pub node_modules_bytes: u64,
+    pub logs_bytes: u64,
+    pub has_node_modules: bool,
+    pub has_logs: bool,
+}
+
+/// Informasi kapasitas penyimpanan sistem & aplikasi (PRD Bagian 13 Fase 12)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemStorageInfo {
+    pub free_disk_bytes: u64,
+    pub free_disk_mb: u64,
+    pub rootfs_bytes: u64,
+    pub rootfs_mb: u64,
+    pub projects_total_bytes: u64,
+    pub projects_total_mb: u64,
+    pub is_low_space: bool,
+}
+
+/// Konfigurasi project untuk Ekspor/Impor JSON tanpa secret (FR-23)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectExportConfig {
+    pub name: String,
+    pub repo_url: String,
+    pub branch: String,
+    pub port_manual: Option<u16>,
+    pub build_cmd: String,
+    pub start_cmd: String,
+    pub auto_start: bool,
+}

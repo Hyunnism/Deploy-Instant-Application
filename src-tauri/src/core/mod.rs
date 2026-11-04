@@ -5,4 +5,5 @@ pub mod pm2;
 pub mod port;
 pub mod project;
 pub mod rootfs;
+pub mod storage;
 pub mod tunnel;

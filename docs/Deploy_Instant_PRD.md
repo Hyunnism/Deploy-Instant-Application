@@ -836,17 +836,17 @@ deploy-instant/
 **Fokus:** disk, kegunaan, dan kualitas akhir.
 
 **Checklist Kode**
-- [ ] Hitung penggunaan disk per project; tombol Bersihkan (`node_modules`, log, hapus project).
-- [ ] Cek ruang kosong sebelum clone/build dan peringatan.
-- [ ] Lokalisasi penuh ID/EN; teks galat ramah (9.8).
-- [ ] Ikon, splash, tema gelap/terang, dan aksesibilitas dasar.
-- [ ] Ekspor/impor konfigurasi JSON tanpa secret (opsional, FR-23).
+- [x] Hitung penggunaan disk per project; tombol Bersihkan (`node_modules`, log, hapus project).
+- [x] Cek ruang kosong sebelum clone/build dan peringatan.
+- [x] Lokalisasi penuh ID/EN; teks galat ramah (9.8).
+- [x] Ikon, splash, tema gelap/terang, dan aksesibilitas dasar.
+- [x] Ekspor/impor konfigurasi JSON tanpa secret (opsional, FR-23).
 
 **Checklist Pengujian**
-- [ ] Bersihkan benar-benar membebaskan ruang.
-- [ ] Peringatan ruang muncul saat hampir penuh.
-- [ ] Uji menyeluruh pada layar kecil dan besar.
-- [ ] Audit string (tidak ada teks hardcode).
+- [x] Bersihkan benar-benar membebaskan ruang.
+- [x] Peringatan ruang muncul saat hampir penuh.
+- [x] Uji menyeluruh pada layar kecil dan besar.
+- [x] Audit string (tidak ada teks hardcode).
 
 **Kriteria selesai:** penyimpanan terkendali dan UI siap dipakai pengguna nyata.
 

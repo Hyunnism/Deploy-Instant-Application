@@ -391,6 +391,70 @@ export async function shutdownCleanly(): Promise<void> {
   return await invoke<void>('shutdown_cleanly');
 }
 
+// Fase 12: Manajemen Penyimpanan, Polesan, dan Ekspor/Impor (FR-23)
+export interface ProjectStorageInfo {
+  project_id: number;
+  project_name: string;
+  total_bytes: number;
+  source_bytes: number;
+  node_modules_bytes: number;
+  logs_bytes: number;
+  has_node_modules: boolean;
+  has_logs: boolean;
+}
+
+export interface SystemStorageInfo {
+  free_disk_bytes: number;
+  free_disk_mb: number;
+  rootfs_bytes: number;
+  rootfs_mb: number;
+  projects_total_bytes: number;
+  projects_total_mb: number;
+  is_low_space: boolean;
+}
+
+export interface ProjectExportConfig {
+  name: string;
+  repo_url: string;
+  branch: string;
+  port_manual?: number | null;
+  build_cmd: string;
+  start_cmd: string;
+  auto_start: boolean;
+}
+
+export async function getSystemStorageInfo(): Promise<SystemStorageInfo> {
+  return await invoke<SystemStorageInfo>('storage_get_system_info');
+}
+
+export async function getProjectStorageInfo(projectId: number): Promise<ProjectStorageInfo> {
+  return await invoke<ProjectStorageInfo>('storage_get_project_info', { projectId });
+}
+
+export async function cleanProjectStorage(
+  projectId: number,
+  target: 'node_modules' | 'logs' | 'all'
+): Promise<number> {
+  return await invoke<number>('storage_clean_project', { projectId, target });
+}
+
+export async function checkStoragePreflight(requiredMb: number): Promise<boolean> {
+  return await invoke<boolean>('storage_check_preflight', { requiredMb });
+}
+
+export async function exportProjectConfig(id: number): Promise<string> {
+  return await invoke<string>('project_export_config', { id });
+}
+
+export async function exportAllConfigs(): Promise<string> {
+  return await invoke<string>('project_export_all_configs');
+}
+
+export async function importProjectConfig(jsonContent: string): Promise<Project> {
+  return await invoke<Project>('project_import_config', { jsonContent });
+}
+
+
 
 
 

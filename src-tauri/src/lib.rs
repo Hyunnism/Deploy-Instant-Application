@@ -86,6 +86,13 @@ pub fn run() {
             commands::lifecycle::open_battery_settings,
             commands::lifecycle::clean_orphans,
             commands::lifecycle::shutdown_cleanly,
+            commands::project::project_export_config,
+            commands::project::project_export_all_configs,
+            commands::project::project_import_config,
+            commands::storage::storage_get_system_info,
+            commands::storage::storage_get_project_info,
+            commands::storage::storage_clean_project,
+            commands::storage::storage_check_preflight,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

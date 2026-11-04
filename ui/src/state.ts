@@ -7,6 +7,8 @@ import type {
   SetupStatusResponse,
   SetupVerificationResult,
   ProjectTunnelInfo,
+  ProjectStorageInfo,
+  SystemStorageInfo,
 } from './api';
 import type { Language } from './i18n';
 
@@ -158,6 +160,29 @@ export interface AppState {
 
   // Fase 11 Lifecycle & Battery State
   batteryIgnored: boolean;
+
+  // Fase 12 Storage, Theme & Export/Import State
+  theme: 'system' | 'light' | 'dark';
+  systemStorage: SystemStorageInfo | null;
+  projectStorage: Record<number, ProjectStorageInfo>;
+  storageModal: {
+    isOpen: boolean;
+    project: Project | null;
+    isLoading: boolean;
+    isCleaning: boolean;
+    info: ProjectStorageInfo | null;
+  };
+  exportModal: {
+    isOpen: boolean;
+    projectName: string;
+    jsonContent: string;
+  };
+  importModal: {
+    isOpen: boolean;
+    jsonContent: string;
+    isImporting: boolean;
+    error: string | null;
+  };
 }
 
 export interface RuntimeLogItem {
@@ -286,4 +311,27 @@ export const state: AppState = {
 
   // Fase 11
   batteryIgnored: false,
+
+  // Fase 12
+  theme: (localStorage.getItem('deploy_instant_theme') as 'system' | 'light' | 'dark') || 'system',
+  systemStorage: null,
+  projectStorage: {},
+  storageModal: {
+    isOpen: false,
+    project: null,
+    isLoading: false,
+    isCleaning: false,
+    info: null,
+  },
+  exportModal: {
+    isOpen: false,
+    projectName: '',
+    jsonContent: '',
+  },
+  importModal: {
+    isOpen: false,
+    jsonContent: '',
+    isImporting: false,
+    error: null,
+  },
 };
