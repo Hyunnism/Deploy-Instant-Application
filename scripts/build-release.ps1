@@ -58,17 +58,24 @@ if ($buildToolsDirs) {
 }
 
 if ($apksigner) {
-    Write-Host "==> Memverifikasi tanda tangan APK..." -ForegroundColor Cyan
-    & $apksigner verify $apkPath 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "==> Menandatangani APK rilis dengan debug/release keystore..." -ForegroundColor Yellow
-        $keystore = "$HOME\.android\debug.keystore"
-        if (Test-Path $keystore) {
-            & $apksigner sign --ks $keystore --ks-pass pass:android --key-pass pass:android --out $apkPath $apkPath
-            Write-Host "==> Berhasil ditandatangani!" -ForegroundColor Green
+    $keystore = "$env:USERPROFILE\.android\debug.keystore"
+    $targetSignedApk = Join-Path $apkFile.Directory.FullName "DeployInstant-v1.0.0-arm64-v8a.apk"
+
+    Write-Host "==> Menandatangani APK rilis dengan debug/release keystore..." -ForegroundColor Cyan
+    if (Test-Path $keystore) {
+        $prevEAP = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & cmd.exe /c "`"$apksigner`" sign --ks `"$keystore`" --ks-pass pass:android --key-pass pass:android --out `"$targetSignedApk`" `"$apkPath`"" 2>&1 | Out-Null
+        $ErrorActionPreference = $prevEAP
+
+        if (Test-Path $targetSignedApk) {
+            $apkPath = $targetSignedApk
+            $apkFile = Get-Item $apkPath
+            $fileSizeMB = [math]::Round($apkFile.Length / 1MB, 2)
+            Write-Host "==> Berhasil ditandatangani: $($apkFile.Name) ($fileSizeMB MB)" -ForegroundColor Green
+        } else {
+            Write-Host "==> Menggunakan APK asli: $($apkFile.Name)" -ForegroundColor Yellow
         }
-    } else {
-        Write-Host "==> APK sudah memiliki tanda tangan yang valid." -ForegroundColor Green
     }
 }
 
