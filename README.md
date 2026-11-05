@@ -1,7 +1,7 @@
 # Deploy Instant
 
-[![CI](https://github.com/hyunnism/deploy-instant/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunnism/deploy-instant/actions/workflows/ci.yml)
-[![Release APK](https://github.com/hyunnism/deploy-instant/actions/workflows/release.yml/badge.svg)](https://github.com/hyunnism/deploy-instant/actions/workflows/release.yml)
+[![CI](https://github.com/Hyunnism/Deploy-Instant-Application/actions/workflows/ci.yml/badge.svg)](https://github.com/Hyunnism/Deploy-Instant-Application/actions/workflows/ci.yml)
+[![Release APK](https://github.com/Hyunnism/Deploy-Instant-Application/actions/workflows/release.yml/badge.svg)](https://github.com/Hyunnism/Deploy-Instant-Application/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Platform: Android arm64](https://img.shields.io/badge/Platform-Android%20arm64-brightgreen.svg)](docs/PANDUAN_PENGGUNA.md)
 
@@ -52,7 +52,7 @@
 ## 🚀 Panduan Memulai Cepat (Pengguna)
 
 1. **Unduh APK Rilis**:
-   Unduh versi terbaru `DeployInstant-vX.Y.Z-arm64-v8a.apk` dari [GitHub Releases](https://github.com/hyunnism/deploy-instant/releases).
+   Unduh versi terbaru `DeployInstant-vX.Y.Z-arm64-v8a.apk` dari [GitHub Releases](https://github.com/Hyunnism/Deploy-Instant-Application/releases).
 2. **Setup Perdana**:
    Buka aplikasi. Tunggu 1–2 menit saat sistem mengekstrak lingkungan Linux internal.
 3. **Tambah & Jalankan Project**:

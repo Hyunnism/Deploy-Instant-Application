@@ -26,7 +26,7 @@ Selamat datang di **Deploy Instant** — aplikasi Android mandiri yang mengubah 
 ---
 
 ## 2. Instalasi dan Setup Pertama Kali
-1. Unduh file APK rilis (`DeployInstant-vX.Y.Z-arm64-v8a.apk`) dari halaman [GitHub Releases](https://github.com/hyunnism/deploy-instant/releases).
+1. Unduh file APK rilis (`DeployInstant-vX.Y.Z-arm64-v8a.apk`) dari halaman [GitHub Releases](https://github.com/Hyunnism/Deploy-Instant-Application/releases).
 2. Pasang APK di perangkat Anda. Berikan izin **Install Unknown Apps** jika diminta.
 3. Buka aplikasi Deploy Instant:
    * Pada peluncuran perdana, aplikasi akan mengekstrak lingkungan Linux mandiri (rootfs Alpine arm64).
