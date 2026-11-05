@@ -1,0 +1,9 @@
+Deploy Instant adalah aplikasi Android mandiri yang berfungsi sebagai VPS mini di dalam smartphone Anda.
+
+Fitur Utama:
+- 100% On-Device: Menjalankan lingkungan Linux (PRoot) mandiri tanpa akses root.
+- PM2 Bawaan: Menjalankan server Node.js di background dengan monitoring status otomatis.
+- Cloudflare Quick Tunnel: Membagikan akses lokal ke publik secara instan lewat URL HTTPS gratis.
+- Hemat Daya & Bersih: Foreground service persisten dan jaminan bebas proses yatim saat aplikasi ditutup.
+- Penyimpanan Terkendali: Alat pembersih cache NPM dan build artifacts bawaan.
+- Tema Gelap & Terang: Antarmuka modern yang nyaman dipakai kapan saja.

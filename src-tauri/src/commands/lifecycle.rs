@@ -2,11 +2,11 @@
 // Command Tauri untuk Lifecycle, Battery Optimization, & Cleanup (PRD Fase 11)
 
 use crate::core::lifecycle::{
-    clean_orphan_processes, is_ignoring_battery_optimizations_native,
-    open_battery_settings_native, shutdown_all_cleanly,
+    clean_orphan_processes, is_ignoring_battery_optimizations_native, open_battery_settings_native,
+    shutdown_all_cleanly,
 };
 use crate::error::{AppError, Result};
-use tauri::{command, AppHandle, Manager};
+use tauri::{AppHandle, Manager, command};
 
 #[command]
 pub async fn get_battery_status() -> Result<bool> {
@@ -32,4 +32,3 @@ pub async fn clean_orphans(app: AppHandle) -> Result<usize> {
 pub async fn shutdown_cleanly(app: AppHandle) -> Result<()> {
     shutdown_all_cleanly(&app).await
 }
-

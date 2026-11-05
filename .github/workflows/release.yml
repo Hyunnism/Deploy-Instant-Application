@@ -4,15 +4,20 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   release:
-    name: Build & Release Android APK
+    name: Build, Sign & Release Android APK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -21,17 +26,89 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Rust & Android target
+      - name: Install Android Build-Tools & NDK
+        run: |
+          sdkmanager "build-tools;34.0.0" "ndk;26.1.10909125"
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust & aarch64 Target
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Build UI
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      - name: Build Web UI
         run: |
           cd ui
           npm ci
           npm run build
 
-      - name: Build Android APK
+      - name: Build Release APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/26.1.10909125
         run: |
-          cargo tauri android build --apk --target aarch64
+          cargo tauri android build --target aarch64 --apk
+
+      - name: Locate & Prepare APK
+        id: apk
+        run: |
+          APK_RAW=$(find src-tauri/gen/android/app/build/outputs/apk -name "*unsigned.apk" -o -name "*release*.apk" | head -n 1)
+          if [ -z "$APK_RAW" ]; then
+            echo "Error: APK not found in build outputs!"
+            exit 1
+          fi
+          echo "Found raw APK: $APK_RAW"
+          TAG_NAME="${{ github.ref_name }}"
+          if [ -z "$TAG_NAME" ]; then TAG_NAME="v1.0.0"; fi
+          TARGET_APK="DeployInstant-${TAG_NAME}-arm64-v8a.apk"
+          cp "$APK_RAW" "$TARGET_APK"
+          echo "apk_path=$TARGET_APK" >> $GITHUB_OUTPUT
+
+      - name: Sign APK (Keystore / Self-signed Fallback)
+        id: sign
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          APK_FILE="${{ steps.apk.outputs.apk_path }}"
+          BUILD_TOOLS_DIR=$(find $ANDROID_HOME/build-tools -name "apksigner" | head -n 1 | xargs dirname)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "==> Signing with repository release keystore secret..."
+            echo "$KEYSTORE_BASE64" | base64 -d > release.jks
+            $APKSIGNER sign --ks release.jks --ks-pass "pass:$KEYSTORE_PASSWORD" --ks-key-alias "$KEY_ALIAS" --key-pass "pass:$KEY_PASSWORD" --out "$APK_FILE" "$APK_FILE"
+            rm -f release.jks
+          else
+            echo "==> Generating temporary self-signed keystore for release..."
+            keytool -genkeypair -v -keystore selfsigned.jks -alias deployinstant -keyalg RSA -keysize 2048 -validity 10000 -storepass deployinstant123 -keypass deployinstant123 -dname "CN=DeployInstant, OU=Engineering, O=Hyunnism, L=Jakarta, C=ID"
+            $APKSIGNER sign --ks selfsigned.jks --ks-pass pass:deployinstant123 --ks-key-alias deployinstant --key-pass pass:deployinstant123 --out "$APK_FILE" "$APK_FILE"
+            rm -f selfsigned.jks
+          fi
+          
+          $APKSIGNER verify --verbose "$APK_FILE"
+          echo "==> APK successfully signed and verified!"
+
+      - name: Generate SHA256 Checksum
+        run: |
+          APK_FILE="${{ steps.apk.outputs.apk_path }}"
+          sha256sum "$APK_FILE" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.apk.outputs.apk_path }}
+            SHA256SUMS.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false

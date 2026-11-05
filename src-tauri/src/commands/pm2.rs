@@ -9,7 +9,8 @@ use crate::storage::db::Database;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
-static LAST_SYNCED_ONLINE_COUNT: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+static LAST_SYNCED_ONLINE_COUNT: std::sync::atomic::AtomicI32 =
+    std::sync::atomic::AtomicI32::new(-1);
 
 /// Helper untuk menyinkronkan status Foreground Service Android berdasarkan proses online
 fn sync_service_state(procs: &[Pm2Status]) {
@@ -123,13 +124,14 @@ pub async fn pm2_restart(app: AppHandle, project_id: i64) -> Result<Pm2Status, S
 
     let (proot_bin, rootfs_dir, tmp_dir) = get_runtime_env(&app)?;
 
-    let res = match pm2::restart_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false).await {
-        Ok(s) => s,
-        Err(_) => {
-            // Fallback: Jika proses belum terdaftar di PM2 (misal setelah kill daemon), mulai ulang dengan start_project
-            return pm2_start(app, project_id).await;
-        }
-    };
+    let res =
+        match pm2::restart_project(&project.name, &proot_bin, &rootfs_dir, &tmp_dir, false).await {
+            Ok(s) => s,
+            Err(_) => {
+                // Fallback: Jika proses belum terdaftar di PM2 (misal setelah kill daemon), mulai ulang dengan start_project
+                return pm2_start(app, project_id).await;
+            }
+        };
 
     if let Ok(procs) = pm2::list_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await {
         sync_service_state(&procs);

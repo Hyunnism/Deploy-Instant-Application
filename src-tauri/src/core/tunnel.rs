@@ -115,10 +115,11 @@ impl TunnelManager {
                     });
                 }
                 // Port berubah, hentikan yang lama dulu
-                if let Some(mut old) = lock.remove(&project_id) {
-                    if let Some(tx) = old.kill_tx.take() {
-                        let _ = tx.send(());
-                    }
+                if let Some(tx) = lock
+                    .remove(&project_id)
+                    .and_then(|mut old| old.kill_tx.take())
+                {
+                    let _ = tx.send(());
                 }
             }
         }
@@ -135,7 +136,9 @@ impl TunnelManager {
             },
         );
 
-        let cmd = format!("exec cloudflared tunnel --url http://127.0.0.1:{port} --no-autoupdate --metrics 127.0.0.1:0 --protocol http2");
+        let cmd = format!(
+            "exec cloudflared tunnel --url http://127.0.0.1:{port} --no-autoupdate --metrics 127.0.0.1:0 --protocol http2"
+        );
 
         // Eksekusi proot command
         let mut child = proot_exec(
@@ -181,9 +184,9 @@ impl TunnelManager {
                     lines.push(line.clone());
                 }
                 if captured_url.is_none() {
-                    if let Some(url) = parse_cloudflare_url(&line) {
-                        captured_url = Some(url.clone());
-                        let _ = url_tx_err.send(url).await;
+                    captured_url = parse_cloudflare_url(&line);
+                    if let Some(ref url) = captured_url {
+                        let _ = url_tx_err.send(url.clone()).await;
                     }
                 }
             }
@@ -204,9 +207,9 @@ impl TunnelManager {
                     lines.push(line.clone());
                 }
                 if captured_url.is_none() {
-                    if let Some(url) = parse_cloudflare_url(&line) {
-                        captured_url = Some(url.clone());
-                        let _ = url_tx.send(url).await;
+                    captured_url = parse_cloudflare_url(&line);
+                    if let Some(ref url) = captured_url {
+                        let _ = url_tx.send(url.clone()).await;
                     }
                 }
             }
@@ -430,10 +433,7 @@ pub fn share_url_native(url: &str, title: &str) -> Result<()> {
         &send_intent,
         "putExtra",
         "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;",
-        &[
-            JValue::Object(&extra_text),
-            JValue::Object(&url_jstring),
-        ],
+        &[JValue::Object(&extra_text), JValue::Object(&url_jstring)],
     )?;
 
     // Intent chooser = Intent.createChooser(sendIntent, title);
@@ -442,19 +442,14 @@ pub fn share_url_native(url: &str, title: &str) -> Result<()> {
             &intent_class,
             "createChooser",
             "(Landroid/content/Intent;Ljava/lang/CharSequence;)Landroid/content/Intent;",
-            &[
-                JValue::Object(&send_intent),
-                JValue::Object(&title_jstring),
-            ],
+            &[JValue::Object(&send_intent), JValue::Object(&title_jstring)],
         )?
         .l()?;
 
     // chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-    let flag_new_task = env.get_static_field(
-        &intent_class,
-        "FLAG_ACTIVITY_NEW_TASK",
-        "I",
-    )?.i()?;
+    let flag_new_task = env
+        .get_static_field(&intent_class, "FLAG_ACTIVITY_NEW_TASK", "I")?
+        .i()?;
     env.call_method(
         &chooser,
         "addFlags",
@@ -475,7 +470,10 @@ pub fn share_url_native(url: &str, title: &str) -> Result<()> {
 
 #[cfg(not(target_os = "android"))]
 pub fn share_url_native(url: &str, title: &str) -> Result<()> {
-    println!("[share_url_native host fallback] Title: {}, URL: {}", title, url);
+    println!(
+        "[share_url_native host fallback] Title: {}, URL: {}",
+        title, url
+    );
     Ok(())
 }
 

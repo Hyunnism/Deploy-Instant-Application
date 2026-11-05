@@ -51,18 +51,15 @@ pub async fn start_tunnel(
         .and_then(|p| p.detected_port.or(p.port));
 
     let port = runtime_port
-        .or_else(|| port::resolve_project_port(&project, &env_vars, &[]).ok().map(|(p, _)| p))
+        .or_else(|| {
+            port::resolve_project_port(&project, &env_vars, &[])
+                .ok()
+                .map(|(p, _)| p)
+        })
         .unwrap_or(3001);
 
     tunnel_mgr
-        .start_tunnel(
-            &app,
-            project_id,
-            port,
-            &proot_bin,
-            &rootfs_dir,
-            &tmp_dir,
-        )
+        .start_tunnel(&app, project_id, port, &proot_bin, &rootfs_dir, &tmp_dir)
         .await
         .map_err(|e| e.to_string())
 }

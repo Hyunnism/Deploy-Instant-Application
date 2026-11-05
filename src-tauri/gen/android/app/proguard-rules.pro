@@ -1,21 +1,25 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# Deploy Instant ProGuard / R8 Rules for Release Build
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Keep Tauri core classes and plugins
+-keep class app.tauri.** { *; }
+-keep interface app.tauri.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep Deploy Instant application classes, activities, services, receivers
+-keep class com.hyunnism.deployinstant.** { *; }
+-keep interface com.hyunnism.deployinstant.** { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep native methods across all classes for JNI linkage
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Keep AndroidX WebKit & JavaScript interfaces
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class androidx.webkit.** { *; }
+
+# Keep Kotlin intrinsics and metadata
+-dontwarn kotlin.**
+-dontwarn javax.annotation.**

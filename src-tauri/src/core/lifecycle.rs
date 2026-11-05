@@ -25,7 +25,10 @@ pub fn get_app_handle() -> Option<AppHandle> {
 pub fn sync_foreground_service_native(active_count: i32, desc: &str) {
     use jni::objects::{JObject, JValue};
 
-    eprintln!("[DeployInstant JNI] sync_foreground_service_native: count={}, desc={}", active_count, desc);
+    eprintln!(
+        "[DeployInstant JNI] sync_foreground_service_native: count={}, desc={}",
+        active_count, desc
+    );
 
     let vm = match unsafe { jni::JavaVM::from_raw(ndk_context::android_context().vm().cast()) } {
         Ok(v) => v,
@@ -68,7 +71,10 @@ pub fn sync_foreground_service_native(active_count: i32, desc: &str) {
 
 #[cfg(not(target_os = "android"))]
 pub fn sync_foreground_service_native(active_count: i32, desc: &str) {
-    println!("[host fallback] sync_foreground_service: {} active, {}", active_count, desc);
+    println!(
+        "[host fallback] sync_foreground_service: {} active, {}",
+        active_count, desc
+    );
 }
 
 #[cfg(target_os = "android")]
@@ -87,12 +93,7 @@ pub fn stop_foreground_service_native() {
     };
 
     let context = unsafe { JObject::from_raw(ndk_context::android_context().context().cast()) };
-    let _ = env.call_method(
-        &context,
-        "stopDeployService",
-        "()V",
-        &[],
-    );
+    let _ = env.call_method(&context, "stopDeployService", "()V", &[]);
     if env.exception_check().unwrap_or(false) {
         let _ = env.exception_clear();
     }
@@ -117,12 +118,7 @@ pub fn is_ignoring_battery_optimizations_native() -> bool {
     };
 
     let context = unsafe { JObject::from_raw(ndk_context::android_context().context().cast()) };
-    let res = env.call_method(
-        &context,
-        "isIgnoringBatteryOptimizations",
-        "()Z",
-        &[],
-    );
+    let res = env.call_method(&context, "isIgnoringBatteryOptimizations", "()Z", &[]);
     if env.exception_check().unwrap_or(false) {
         let _ = env.exception_clear();
         return false;
@@ -152,12 +148,7 @@ pub fn open_battery_settings_native() {
     };
 
     let context = unsafe { JObject::from_raw(ndk_context::android_context().context().cast()) };
-    let _ = env.call_method(
-        &context,
-        "openBatterySettings",
-        "()V",
-        &[],
-    );
+    let _ = env.call_method(&context, "openBatterySettings", "()V", &[]);
     if env.exception_check().unwrap_or(false) {
         let _ = env.exception_clear();
     }
@@ -223,7 +214,8 @@ pub async fn shutdown_all_cleanly(app: &AppHandle) -> Result<()> {
     let tmp_dir = app_files_dir.join("tmp");
 
     if rootfs_dir.exists() {
-        let _ = crate::core::pm2::stop_all_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await;
+        let _ =
+            crate::core::pm2::stop_all_processes(&proot_bin, &rootfs_dir, &tmp_dir, false).await;
         let _ = crate::core::pm2::kill_pm2_daemon(&proot_bin, &rootfs_dir, &tmp_dir, false).await;
     }
 
@@ -257,10 +249,8 @@ pub async fn clean_orphan_processes(app_files_dir: &std::path::Path) -> usize {
         false,
         true,
     );
-    if let Ok(out) = cmd_cf.output().await {
-        if out.status.success() {
-            cleaned += 1;
-        }
+    if cmd_cf.output().await.is_ok_and(|out| out.status.success()) {
+        cleaned += 1;
     }
 
     cleaned

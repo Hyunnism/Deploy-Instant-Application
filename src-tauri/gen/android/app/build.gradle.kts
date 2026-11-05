@@ -47,6 +47,8 @@ android {
             }
         }
         getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = true
             optimization {
                enable = true
             }
@@ -54,10 +56,8 @@ android {
                 jniLibs.useLegacyPackaging = true
             }
             proguardFiles(
-                *fileTree(".") {
-                  include("**/*.pro")
-                  exclude("build/**")
-                }.files.toTypedArray()
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                file("proguard-rules.pro")
             )
         }
     }

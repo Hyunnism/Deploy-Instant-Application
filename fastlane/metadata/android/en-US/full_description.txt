@@ -1,0 +1,9 @@
+Deploy Instant is a self-contained Android application that turns your smartphone into a pocket-sized mini VPS.
+
+Key Features:
+- 100% On-Device: Runs an isolated Linux environment (PRoot) with zero root requirements.
+- Native PM2: Manages background Node.js processes with automated health checks.
+- Instant Cloudflare Quick Tunnel: Shares your local web services to the world via free HTTPS URLs.
+- Power-Efficient & Clean: Persistent Android Foreground Service with a zero-orphan lifecycle guarantee.
+- Storage Management: Built-in disk usage inspector, npm cache cleaner, and artifact cleanup.
+- Dark & Light Themes: Modern, accessible user interface optimized for mobile workflows.

@@ -32,7 +32,10 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 let cleaned = core::lifecycle::clean_orphan_processes(&app_files_dir_clone).await;
                 if cleaned > 0 {
-                    eprintln!("[DeployInstant Lifecycle] Membersihkan {} proses yatim saat startup.", cleaned);
+                    eprintln!(
+                        "[DeployInstant Lifecycle] Membersihkan {} proses yatim saat startup.",
+                        cleaned
+                    );
                 }
             });
 

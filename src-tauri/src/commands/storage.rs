@@ -31,10 +31,13 @@ pub async fn storage_clean_project(
     let project = db.get_project(project_id).map_err(|e| e.to_string())?;
 
     match target.as_str() {
-        "node_modules" => storage::clean_project_node_modules(&app, &project).map_err(|e| e.to_string()),
+        "node_modules" => {
+            storage::clean_project_node_modules(&app, &project).map_err(|e| e.to_string())
+        }
         "logs" => storage::clean_project_logs(&app, &project).map_err(|e| e.to_string()),
         "all" => {
-            let mut freed = storage::clean_project_node_modules(&app, &project).map_err(|e| e.to_string())?;
+            let mut freed =
+                storage::clean_project_node_modules(&app, &project).map_err(|e| e.to_string())?;
             freed += storage::clean_project_logs(&app, &project).map_err(|e| e.to_string())?;
             Ok(freed)
         }
@@ -49,4 +52,3 @@ pub async fn storage_check_preflight(app: AppHandle, required_mb: u64) -> Result
         Err(e) => Err(e.to_string()),
     }
 }
-

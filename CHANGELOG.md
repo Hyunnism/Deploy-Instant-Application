@@ -3,6 +3,41 @@
 Semua perubahan pada proyek **Deploy Instant** akan didokumentasikan di file ini.
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id/1.0.0/).
 
+## [1.0.0] - 2026-11-05
+### Ditambahkan
+- **Fase 13 — Pengujian Menyeluruh, Rilis, dan Distribusi (MVP Final)**:
+  - Optimasi ukuran binary Rust pada `Cargo.toml` via `[profile.release]` (`opt-level = "z"`, `lto = true`, `strip = true`, `codegen-units = 1`, `panic = "abort"`).
+  - Minifikasi R8/ProGuard pada build Android release (`isMinifyEnabled = true`, `isShrinkResources = true`) dan aturan `proguard-rules.pro` untuk Tauri/JNI bindings.
+  - Pipeline GitHub Actions otomatis (`.github/workflows/release.yml`) dengan penandatanganan APK, kalkulasi SHA256 checksums, dan pembuatan rilis GitHub.
+  - Skrip PowerShell rilis mandiri (`scripts/build-release.ps1`) untuk kompilasi lokal dengan verifikasi tanda tangan dan checksum.
+  - Panduan pengguna lengkap berbahasa Indonesia (`docs/PANDUAN_PENGGUNA.md`).
+  - Template catatan rilis GitHub (`.github/release-notes-template.md`) dan metadata Fastlane/F-Droid (bahasa Indonesia dan Inggris).
+  - Skrip verifikasi E2E skenario PRD 3.2 dan audit keamanan tanpa kebocoran data rahasia (`scripts/test-e2e.ps1`).
+- **Fase 12 — Manajemen Penyimpanan dan Polesan**:
+  - Pelacak penggunaan disk lokal (rootfs, projects, logs, npm cache).
+  - Fitur pembersihan cache NPM dan pembersihan build artifacts aman.
+  - Peringatan ruang penyimpanan rendah saat sisa disk < 500 MB.
+  - Fitur Ekspor & Impor konfigurasi proyek (JSON) dengan penyensoran kredensial sensitif.
+  - Tema Gelap & Terang adaptif mengikuti preferensi sistem operasi dengan opsi manual.
+- **Fase 11 — Lifecycle dan Baterai**:
+  - Android Foreground Service persisten dengan notifikasi status jumlah proyek aktif.
+  - Integrasi WakeLock untuk mencegah HP tidur saat melayani request server.
+  - Jaminan zero-orphan lifecycle: mematikan seluruh proses `pm2`, `cloudflared`, dan `proot` saat aplikasi dihentikan.
+  - Dialog rekomendasi pengaturan optimasi baterai (whitelist unrestricted battery).
+- **Fase 10 — Cloudflare Quick Tunnel**:
+  - Quick Tunnel Cloudflare publik instan (`*.trycloudflare.com`) via `cloudflared`.
+  - Deteksi URL publik otomatis lewat parsing output regex/box-drawing.
+  - Android native Share Sheet dan dialog peringatan akses publik aman dari gesture bar.
+- **Fase 9 — Deteksi Port & Akses Lokal**:
+  - Parsing real-time `/proc/net/tcp` dan `/proc/net/tcp6` di dalam rootfs sandbox.
+  - Deteksi bentrok port antar-proyek dan auto-assignment port bebas.
+- **Fase 8 — Runtime Logs Streaming**:
+  - Streaming stdout & stderr proses PM2 secara real-time via event Tauri `runtime:log`.
+  - Filter log (Semua, Stdout, Stderr) dan fitur salin log ke clipboard.
+- **Fase 7 — Manajemen Proses PM2**:
+  - Integrasi penuh PM2 asli di dalam rootfs untuk start, stop, restart, dan delete process.
+  - Polling status health process berkala dengan deteksi status online, stopped, error.
+
 ## [0.7.0] - 2026-10-31
 ### Ditambahkan
 - **Fase 6 — Environment Variables**:

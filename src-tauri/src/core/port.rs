@@ -135,12 +135,12 @@ pub fn get_process_socket_inodes(pid: u32) -> Vec<u64> {
             if let Ok(target) = std::fs::read_link(entry.path()) {
                 let target_str = target.to_string_lossy();
                 // Format link socket di procfs Linux: "socket:[123456]"
-                if let Some(rest) = target_str.strip_prefix("socket:[") {
-                    if let Some(inode_str) = rest.strip_suffix(']') {
-                        if let Ok(inode) = inode_str.parse::<u64>() {
-                            inodes.push(inode);
-                        }
-                    }
+                if let Some(inode) = target_str
+                    .strip_prefix("socket:[")
+                    .and_then(|r| r.strip_suffix(']'))
+                    .and_then(|s| s.parse::<u64>().ok())
+                {
+                    inodes.push(inode);
                 }
             }
         }
@@ -153,10 +153,7 @@ pub fn get_process_socket_inodes(pid: u32) -> Vec<u64> {
 /// 1. Inspeksi socket inode dari `/proc/<pid>/fd` dan cocokkan dengan `/proc/net/tcp` serta `/proc/net/tcp6`.
 /// 2. Jika pencocokan inode terhalang pembatasan sandbox OEM, cocokkan socket TCP_LISTEN milik UID aplikasi.
 /// 3. Fallback active probe koneksi TCP untuk verifikasi keandalan.
-pub fn detect_process_listening_port(
-    pid: Option<u32>,
-    expected_port: Option<u16>,
-) -> Option<u16> {
+pub fn detect_process_listening_port(pid: Option<u32>, expected_port: Option<u16>) -> Option<u16> {
     // 1. Kumpulkan semua listening sockets dari IPv4 & IPv6 dual-stack di kernel
     let mut all_listening = Vec::new();
     if let Ok(tcp_content) = std::fs::read_to_string("/proc/net/tcp") {
@@ -204,10 +201,8 @@ pub fn detect_process_listening_port(
     }
 
     // Terakhir: bila expected_port listening
-    if let Some(exp) = expected_port {
-        if is_port_listening(exp) {
-            return Some(exp);
-        }
+    if let Some(exp) = expected_port.filter(|&exp| is_port_listening(exp)) {
+        return Some(exp);
     }
 
     None
@@ -223,8 +218,7 @@ pub fn open_in_browser(url: &str) -> Result<()> {
     let mut env = vm
         .attach_current_thread()
         .map_err(|e| AppError::Internal(format!("Attach thread error: {e}")))?;
-    let context =
-        unsafe { JObject::from_raw(ndk_context::android_context().context().cast()) };
+    let context = unsafe { JObject::from_raw(ndk_context::android_context().context().cast()) };
 
     let url_jstring = env
         .new_string(url)

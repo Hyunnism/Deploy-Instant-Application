@@ -46,8 +46,14 @@ pub fn get_project_storage_info(app: &AppHandle, project: &Project) -> Result<Pr
     let source_bytes = total_app_bytes.saturating_sub(node_modules_bytes);
 
     // Hitung ukuran log build dan runtime
-    let build_log_file = app_files_dir.join("logs").join("builds").join(format!("{}.log", project.name));
-    let runtime_log_file = app_files_dir.join("logs").join("projects").join(format!("{}.log", project.name));
+    let build_log_file = app_files_dir
+        .join("logs")
+        .join("builds")
+        .join(format!("{}.log", project.name));
+    let runtime_log_file = app_files_dir
+        .join("logs")
+        .join("projects")
+        .join(format!("{}.log", project.name));
 
     let build_log_bytes = if build_log_file.exists() {
         build_log_file.metadata().map(|m| m.len()).unwrap_or(0)
@@ -139,8 +145,14 @@ pub fn clean_project_logs(app: &AppHandle, project: &Project) -> Result<u64> {
         .app_data_dir()
         .map_err(|e| AppError::Internal(format!("Gagal mendapatkan app_data_dir: {e}")))?;
 
-    let build_log_file = app_files_dir.join("logs").join("builds").join(format!("{}.log", project.name));
-    let runtime_log_file = app_files_dir.join("logs").join("projects").join(format!("{}.log", project.name));
+    let build_log_file = app_files_dir
+        .join("logs")
+        .join("builds")
+        .join(format!("{}.log", project.name));
+    let runtime_log_file = app_files_dir
+        .join("logs")
+        .join("projects")
+        .join(format!("{}.log", project.name));
 
     let mut bytes_freed = 0u64;
 
@@ -192,4 +204,3 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
     }
 }
-
