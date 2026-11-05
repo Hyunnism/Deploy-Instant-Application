@@ -117,3 +117,4 @@ Agar server Node.js dan tunnel tidak dimatikan oleh sistem manajemen daya agresi
   *J:* Gunakan **SQLite** (file lokal di dalam folder proyek seperti Prisma/Drizzle) untuk performa tercepat tanpa makan RAM, atau gunakan database cloud eksternal (Supabase, Neon, PlanetScale) via variabel `.env`.
 * **T: Apakah aman membagikan URL tunnel?**  
   *J:* Akses tunnel terbuka untuk publik di internet. Pastikan backend Anda memiliki autentikasi yang aman jika memproses data sensitif.
+

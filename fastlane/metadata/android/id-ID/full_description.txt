@@ -7,3 +7,4 @@ Fitur Utama:
 - Hemat Daya & Bersih: Foreground service persisten dan jaminan bebas proses yatim saat aplikasi ditutup.
 - Penyimpanan Terkendali: Alat pembersih cache NPM dan build artifacts bawaan.
 - Tema Gelap & Terang: Antarmuka modern yang nyaman dipakai kapan saja.
+

@@ -7,3 +7,4 @@ Key Features:
 - Power-Efficient & Clean: Persistent Android Foreground Service with a zero-orphan lifecycle guarantee.
 - Storage Management: Built-in disk usage inspector, npm cache cleaner, and artifact cleanup.
 - Dark & Light Themes: Modern, accessible user interface optimized for mobile workflows.
+

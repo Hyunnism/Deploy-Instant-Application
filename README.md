@@ -3,7 +3,7 @@
 [![CI](https://github.com/hyunnism/deploy-instant/actions/workflows/ci.yml/badge.svg)](https://github.com/hyunnism/deploy-instant/actions/workflows/ci.yml)
 [![Release APK](https://github.com/hyunnism/deploy-instant/actions/workflows/release.yml/badge.svg)](https://github.com/hyunnism/deploy-instant/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform: Android arm64](https://img.shields.io/badge/Platform-Android%20arm64-brightgreen.svg)](docs/Deploy_Instant_PRD.md)
+[![Platform: Android arm64](https://img.shields.io/badge/Platform-Android%20arm64-brightgreen.svg)](docs/PANDUAN_PENGGUNA.md)
 
 > **VPS mini di dalam smartphone Android Anda.** Jalankan proyek Node.js production dari GitHub langsung di HP dengan PM2, dan bagikan akses publik secara instan via Cloudflare Quick Tunnel — tanpa biaya server, tanpa VMware, dan tanpa IP publik.
 
@@ -93,7 +93,7 @@
 * `src-tauri/` — Rust core backend, bridge JNI Android, dan manajemen proses.
 * `ui/` — Antarmuka web responsif berbasis Vite, Vanilla TypeScript, dan CSS modern (Light/Dark theme).
 * `scripts/` — Skrip otomatisasi build, pengujian, dan deployment (`check.ps1`, `build-release.ps1`).
-* `docs/` — Dokumen PRD ([Deploy_Instant_PRD.md](docs/Deploy_Instant_PRD.md)), panduan pengguna, dan catatan arsitektur.
+* `docs/` — Panduan pengguna aplikasi ([PANDUAN_PENGGUNA.md](docs/PANDUAN_PENGGUNA.md)).
 * `fastlane/` — Metadata aplikasi untuk publikasi F-Droid (bahasa Indonesia & Inggris).
 
 ---

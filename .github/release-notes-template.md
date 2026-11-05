@@ -31,3 +31,4 @@ sha256sum -c SHA256SUMS.txt
 Get-FileHash -Algorithm SHA256 .\DeployInstant-$VERSION-arm64-v8a.apk
 ```
 Bandungkan nilai hash dengan isi berkas `SHA256SUMS.txt`.
+

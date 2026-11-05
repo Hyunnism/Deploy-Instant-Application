@@ -36,3 +36,8 @@ logs/
 Thumbs.db
 .DS_Store
 *.pdf
+
+# Documentation (hanya sertakan PANDUAN_PENGGUNA.md di repo)
+docs/*
+!docs/PANDUAN_PENGGUNA.md
+
